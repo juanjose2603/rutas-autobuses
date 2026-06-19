@@ -3,32 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rutas Transporte Lima</title>
+    <title>Rutas Transporte Lima - Mapa Completo</title>
     <style>
         * {margin:0; padding:0; box-sizing:border-box; font-family:Arial, sans-serif;}
-        body {display:flex; flex-direction:column; height:100vh;}
-        .panel {padding:15px; background:#f8f9fa; border-bottom:1px solid #ddd;}
-        input {width:100%; padding:10px; margin:5px 0; border:1px solid #ccc; border-radius:4px;}
-        button {width:100%; padding:10px; margin:5px 0; background:#1a73e8; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:15px;}
-        .btn-verde {background:#34a853; margin-bottom:10px;}
-        #map {flex:1; min-height:400px;}
-        #resultados {margin-top:10px; max-height:220px; overflow-y:auto; font-size:14px;}
-        .ruta {padding:8px; margin:5px 0; background:#fff; border-radius:4px; border-left:4px solid #1a73e8;}
-        .error {color:#d93025; padding:8px; background:#fce8e6; border-radius:4px; margin:5px 0;}
+        html, body {height:100%; overflow:hidden;}
+
+        /* 📌 MENÚ ARRIBA FIJO, MAPA ABAJO COMPLETO */
+        .cabecera {
+            position: absolute;
+            top:0; left:0; right:0;
+            z-index: 100;
+            background: #ffffff;
+            padding:12px 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            border-bottom:1px solid #ddd;
+        }
+        .fila {display:flex; gap:8px; flex-wrap:wrap; margin:6px 0;}
+        input, select, button {
+            padding:10px 12px;
+            border:1px solid #ccc;
+            border-radius:4px;
+            font-size:14px;
+        }
+        input {flex:1; min-width:220px;}
+        button {
+            background:#1a73e8;
+            color:white;
+            border:none;
+            cursor:pointer;
+            font-weight:bold;
+        }
+        .btn-verde {background:#34a853;}
+        select {
+            background:#f8f9fa;
+            flex:1;
+            min-width:280px;
+            font-weight:500;
+        }
+        #map {
+            width:100%;
+            height:100%;
+            margin-top: 110px; /* Deja espacio solo al menú */
+        }
+        .error {color:#d93025; padding:6px; font-size:13px; margin-top:4px;}
+        .info {color:#137333; padding:6px; font-size:13px; margin-top:4px;}
     </style>
 </head>
 <body>
-    <div class="panel">
-        <button class="btn-verde" onclick="usarUbicacionActual()">📍 Usar mi ubicación actual</button>
-        <input id="origen" placeholder="Dirección de partida" value="Lima, Perú">
-        <input id="destino" placeholder="Ej: Av. Javier Prado 123, Lima, Perú">
-        <button onclick="calcularRuta()">🔍 Buscar rutas</button>
-        <div id="resultados"></div>
+
+    <!-- 📌 MENÚ SUPERIOR: TODO AQUÍ, MAPA LIBRE -->
+    <div class="cabecera">
+        <button class="btn-verde" onclick="usarUbicacionActual()">📍 Usar mi ubicación</button>
+        <div class="fila">
+            <input id="origen" placeholder="Dirección de partida" value="Lima, Perú">
+            <input id="destino" placeholder="Ej: Av. Javier Prado 123, Lima, Perú">
+            <button onclick="buscarRutas()">🔍 Buscar</button>
+        </div>
+
+        <!-- 📌 MENÚ DESPLEGABLE DE RUTAS (AQUÍ APARECEN TODAS LAS OPCIONES) -->
+        <div class="fila" id="selectorRutas" style="display:none;">
+            <select id="listaRutas" onchange="mostrarRutaSeleccionada()">
+                <option value="">🔽 Elige una ruta disponible</option>
+            </select>
+        </div>
+
+        <div id="mensaje"></div>
     </div>
+
+    <!-- 🗺️ MAPA: OCUPA TODA LA PANTALLA, SIN NINGÚN BLOQUE ARRIBA -->
     <div id="map"></div>
 
     <script>
-        let map, directionsService, directionsRenderer;
+        let map, directionsService, directionsRenderers = [];
+        let rutasDisponibles = [];
         const LIMA = {lat: -12.0464, lng: -77.0428};
 
         function initMap() {
@@ -36,22 +83,20 @@
                 center: LIMA,
                 zoom: 12,
                 language: "es",
-                region: "PE"
+                region: "PE",
+                fullscreenControl: true
             });
             new google.maps.TransitLayer().setMap(map);
             directionsService = new google.maps.DirectionsService();
-            directionsRenderer = new google.maps.DirectionsRenderer({
-                map: map,
-                panel: document.getElementById("resultados"),
-                suppressMarkers: false
-            });
 
+            // Autocompletar direcciones PERÚ
             new google.maps.places.Autocomplete(document.getElementById("origen"), {componentRestrictions: {country: "PE"}});
             new google.maps.places.Autocomplete(document.getElementById("destino"), {componentRestrictions: {country: "PE"}});
         }
 
+        // 📍 Ubicación actual
         function usarUbicacionActual() {
-            if (!navigator.geolocation) return alert("No admite ubicación");
+            if (!navigator.geolocation) return mostrarMensaje("Tu navegador no admite ubicación", "error");
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
                     const ubi = {lat: pos.coords.latitude, lng: pos.coords.longitude};
@@ -61,55 +106,108 @@
                         map.setCenter(ubi);
                     });
                 },
-                () => alert("Permiso denegado o error"),
+                () => mostrarMensaje("Permiso denegado o error al obtener ubicación", "error"),
                 {enableHighAccuracy: true, timeout: 8000}
             );
         }
 
-        function calcularRuta() {
+        // 🚌 BUSCAR TODAS LAS RUTAS Y MOSTRAR EN MENÚ DESPLEGABLE
+        function buscarRutas() {
             const origen = document.getElementById("origen").value.trim();
             const destino = document.getElementById("destino").value.trim();
-            if (!origen || !destino) return mostrarError("Completa ambas direcciones");
+            const msg = document.getElementById("mensaje");
+            msg.innerHTML = "";
 
+            if (!origen || !destino) return mostrarMensaje("Completa ambas direcciones", "error");
             const origenFinal = origen.includes("Perú") ? origen : origen + ", Lima, Perú";
             const destinoFinal = destino.includes("Perú") ? destino : destino + ", Lima, Perú";
+
+            // Limpiar rutas anteriores
+            directionsRenderers.forEach(r => r.setMap(null));
+            directionsRenderers = [];
+            rutasDisponibles = [];
+            document.getElementById("selectorRutas").style.display = "none";
+            document.getElementById("listaRutas").innerHTML = "<option value=''>🔽 Cargando rutas...</option>";
 
             directionsService.route({
                 origin: origenFinal,
                 destination: destinoFinal,
                 travelMode: google.maps.TravelMode.TRANSIT,
-                // ✅ CORREGIDO: sin arrivalTime, modos correctos
-                transitOptions: {
-                    modes: ["BUS", "SUBWAY"],
-                    routingPreference: "FEWER_TRANSFERS"
-                },
+                transitOptions: {modes: ["BUS", "SUBWAY"], routingPreference: "FEWER_TRANSFERS"},
                 provideRouteAlternatives: true,
                 unitSystem: google.maps.UnitSystem.METRIC,
                 region: "PE",
                 language: "es"
             }, (res, estado) => {
                 if (estado === "OK") {
-                    directionsRenderer.setDirections(res);
+                    // Guardar todas las rutas
+                    rutasDisponibles = res.routes;
+                    llenarMenuRutas();
+                    mostrarMensaje(`✅ Se encontraron ${rutasDisponibles.length} rutas disponibles`, "info");
                 } else {
-                    let msg;
-                    switch(estado) {
-                        case "UNKNOWN_ERROR": msg = "❌ ERROR: Falta activar FACTURACIÓN en Google Cloud (es gratis) o clave mal configurada"; break;
-                        case "REQUEST_DENIED": msg = "❌ Clave API inválida o APIs no activadas"; break;
-                        case "NOT_FOUND": msg = "❌ No se reconoció la dirección → agrega: , Lima, Perú"; break;
-                        case "ZERO_RESULTS": msg = "ℹ️ No hay transporte público directo"; break;
-                        default: msg = "Error: " + estado;
-                    }
-                    mostrarError(msg);
+                    let texto;
+                    if (estado === "UNKNOWN_ERROR") texto = "❌ Activa FACTURACIÓN en Google Cloud (es gratis)";
+                    else if (estado === "REQUEST_DENIED") texto = "❌ Clave API inválida o APIs no activadas";
+                    else if (estado === "NOT_FOUND") texto = "❌ Dirección no reconocida → agrega: , Lima, Perú";
+                    else if (estado === "ZERO_RESULTS") texto = "ℹ️ No hay transporte público directo";
+                    else texto = "Error: " + estado;
+                    mostrarMensaje(texto, "error");
                 }
             });
         }
 
-        function mostrarError(texto) {
-            document.getElementById("resultados").innerHTML = `<div class="error">${texto}</div>`;
+        // 📋 LLENAR EL MENÚ DESPLEGABLE
+        function llenarMenuRutas() {
+            const select = document.getElementById("listaRutas");
+            select.innerHTML = "";
+
+            rutasDisponibles.forEach((ruta, i) => {
+                const tiempo = ruta.legs[0].duration.text;
+                const distancia = ruta.legs[0].distance.text;
+                const transbordos = ruta.legs[0].steps.filter(s => s.travel_mode === "TRANSIT").length-1;
+                const texto = `Ruta ${i+1} — ${tiempo} | ${distancia} | ${transbordos>=0 ? transbordos+" transbordo(s)" : "directo"}`;
+
+                const opcion = document.createElement("option");
+                opcion.value = i;
+                opcion.textContent = texto;
+                select.appendChild(opcion);
+            });
+
+            document.getElementById("selectorRutas").style.display = "flex";
+            // Mostrar primera ruta automáticamente
+            if (rutasDisponibles.length>0) {
+                select.value = "0";
+                mostrarRutaSeleccionada();
+            }
+        }
+
+        // 🗺️ DIBUJAR RUTA ELEGIDA EN EL MAPA COMPLETO
+        function mostrarRutaSeleccionada() {
+            const indice = parseInt(document.getElementById("listaRutas").value);
+            if (isNaN(indice)) return;
+
+            // Limpiar anteriores
+            directionsRenderers.forEach(r => r.setMap(null));
+            directionsRenderers = [];
+
+            // Crear solo la ruta elegida
+            const render = new google.maps.DirectionsRenderer({
+                map: map,
+                routeIndex: indice,
+                suppressMarkers: false,
+                preserveViewport: false
+            });
+            render.setDirections({routes: [rutasDisponibles[indice]]});
+            directionsRenderers.push(render);
+        }
+
+        function mostrarMensaje(texto, tipo) {
+            const msg = document.getElementById("mensaje");
+            msg.innerHTML = `<div class="${tipo}">${texto}</div>`;
         }
     </script>
 
-    <!-- ✅ APIs completas -->
+    <!-- 📌 TU CLAVE AQUÍ -->
     <script async defer
         src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places,geocoding,directions&callback=initMap&language=es&region=PE">
     </script>
