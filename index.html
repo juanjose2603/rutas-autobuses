@@ -84,10 +84,9 @@
                 return;
             }
 
-            // Opciones para mayor precisión
             const opciones = {
                 enableHighAccuracy: true,
-                timeout: 10000, // Espera máximo 10 segundos
+                timeout: 10000,
                 maximumAge: 0
             };
 
@@ -98,7 +97,6 @@
                         lng: posicion.coords.longitude
                     };
 
-                    // Convertir coordenadas a dirección legible
                     const geocoder = new google.maps.Geocoder();
                     geocoder.geocode({ location: ubicacionActual }, (resultados, status) => {
                         if (status === "OK" && resultados[0]) {
@@ -132,15 +130,21 @@
             );
         }
 
-        // Calcular ruta con todos los transportes
+        // Calcular ruta con manejo de errores
         function calcularRuta() {
+            const estado = document.getElementById("estado");
+            const resultado = document.getElementById("resultado");
             const origen = autocompleteOrigen.getPlace()?.formatted_address || ubicacionActual;
             const destino = autocompleteDestino.getPlace();
 
             if (!destino?.geometry || !origen) {
-                document.getElementById("resultado").innerHTML = "<p>ℹ️ Completa ambos campos para ver rutas.</p>";
+                resultado.innerHTML = "<p>ℹ️ Completa ambos campos y selecciona una dirección de la lista.</p>";
                 return;
             }
+
+            estado.textContent = "🔄 Calculando ruta...";
+            estado.style.background = "#fff3e0";
+            estado.style.color = "#e65100";
 
             const solicitud = {
                 origin: origen,
@@ -158,12 +162,26 @@
                 unitSystem: google.maps.UnitSystem.METRIC
             };
 
-            directionsService.route(solicitud, (respuesta, estado) => {
-                if (estado === "OK") {
+            directionsService.route(solicitud, (respuesta, estadoRuta) => {
+                if (estadoRuta === "OK") {
                     directionsRenderer.setDirections(respuesta);
                     mostrarResultados(respuesta);
+                    estado.textContent = "✅ Ruta encontrada";
+                    estado.style.background = "#e8f5e9";
+                    estado.style.color = "#1b5e20";
                 } else {
-                    document.getElementById("resultado").innerHTML = "<p>❌ No se encontraron rutas.</p>";
+                    let mensajeError = "❌ No se pudo calcular la ruta: ";
+                    switch(estadoRuta) {
+                        case "NOT_FOUND": mensajeError += "Dirección no encontrada."; break;
+                        case "ZERO_RESULTS": mensajeError += "No hay rutas de transporte público entre esos puntos."; break;
+                        case "OVER_QUERY_LIMIT": mensajeError += "Límite de consultas excedido o clave API inválida."; break;
+                        case "REQUEST_DENIED": mensajeError += "Solicitud rechazada: revisa tu clave API y servicios habilitados."; break;
+                        default: mensajeError += estadoRuta;
+                    }
+                    resultado.innerHTML = `<p>${mensajeError}</p>`;
+                    estado.textContent = "⚠️ Error al buscar ruta";
+                    estado.style.background = "#ffebee";
+                    estado.style.color = "#b71c1c";
                 }
             });
         }
@@ -216,12 +234,12 @@
                 html += `</div>`;
             });
 
-            html += `<p style="font-size:12px; color:#666; margin-top:10px;">ℹ️ Datos actualizados según ATU</p>`;
+            html += `<p style="font-size:12px; color:#666; margin-top:10px;">ℹ️ Datos proporcionados por Google Maps</p>`;
             document.getElementById("resultado").innerHTML = html;
         }
     </script>
 
-    <!-- 👇 COLOCA TU CLAVE API AQUÍ -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places,geocoding&callback=initMap" async defer></script>
+    <!-- 👇 LIBRERÍAS COMPLETAS + TU CLAVE API -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places,geocoding,directions&callback=initMap" async defer></script>
 </body>
 </html>
