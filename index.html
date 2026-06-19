@@ -20,7 +20,6 @@
         .tipo-corredor { border-color:#ffc107; }
         .tipo-metropolitano { border-color:#dc3545; }
         .tiempo { font-weight:bold; color:#28a745; }
-        .error { background: #ffebee; color: #b71c1c; padding: 10px; border-radius: 4px; margin: 10px 0; }
     </style>
 </head>
 <body>
@@ -51,11 +50,7 @@
             });
 
             directionsService = new google.maps.DirectionsService();
-            directionsRenderer = new google.maps.DirectionsRenderer({ 
-                map: map,
-                suppressMarkers: false,
-                preserveViewport: false
-            });
+            directionsRenderer = new google.maps.DirectionsRenderer({ map: map });
             new google.maps.TransitLayer().setMap(map);
 
             // Autocompletar direcciones solo en Perú
@@ -68,29 +63,21 @@
                 fields: ["formatted_address", "geometry", "name"]
             });
 
-            // ✅ CORRECCIÓN: Aseguramos que se seleccione de la lista
+            // Evento al seleccionar lugar
             autocompleteOrigen.addListener("place_changed", () => {
                 const lugar = autocompleteOrigen.getPlace();
-                if (!lugar.geometry) {
-                    document.getElementById("estado").textContent = "⚠️ Escribe y SELECCIONA una dirección de la lista";
-                    document.getElementById("estado").style.background = "#fff3e0";
-                    return;
-                }
-                calcularRuta();
+                if (lugar.geometry) calcularRuta();
             });
-
             autocompleteDestino.addListener("place_changed", () => {
                 const lugar = autocompleteDestino.getPlace();
-                if (!lugar.geometry) {
-                    document.getElementById("estado").textContent = "⚠️ Escribe y SELECCIONA una dirección de la lista";
-                    document.getElementById("estado").style.background = "#fff3e0";
-                    return;
-                }
-                calcularRuta();
+                if (lugar.geometry) calcularRuta();
             });
 
             // Intentar obtener ubicación al iniciar
             usarUbicacionActual();
+            document.getElementById("estado").textContent = "✅ Sistema listo";
+            document.getElementById("estado").style.background = "#e8f5e9";
+            document.getElementById("estado").style.color = "#1b5e20";
         }
 
         // 📍 Función mejorada para detectar ubicación
@@ -153,41 +140,40 @@
             );
         }
 
-        // ✅ FUNCIÓN CORREGIDA CON ERRORES DETALLADOS
+        // Calcular ruta con manejo de errores MEJORADO
         function calcularRuta() {
             const estado = document.getElementById("estado");
             const resultado = document.getElementById("resultado");
             
-            // Obtener valores validados
-            let origen = autocompleteOrigen.getPlace();
-            let destino = autocompleteDestino.getPlace();
-
-            // Validación estricta
-            if (!destino || !destino.geometry) {
-                resultado.innerHTML = `<p class="error">❌ Escribe y SELECCIONA el DESTINO de la lista que aparece abajo</p>`;
+            // 👉 VALIDACIÓN CLAVE: Obtener origen correctamente
+            let origen;
+            const lugarOrigen = autocompleteOrigen.getPlace();
+            if (lugarOrigen && lugarOrigen.formatted_address) {
+                origen = lugarOrigen.formatted_address;
+            } else if (ubicacionActual) {
+                origen = ubicacionActual; // Usamos coordenadas si no hay dirección
+            } else {
+                resultado.innerHTML = "<p style='color:red;'>⚠️ Selecciona o escribe un punto de inicio válido.</p>";
                 return;
             }
 
-            if (!origen || !origen.geometry) {
-                if (ubicacionActual) {
-                    origen = ubicacionActual; // Usar coordenadas si no hay lugar seleccionado
-                } else {
-                    resultado.innerHTML = `<p class="error">❌ Escribe y SELECCIONA el ORIGEN de la lista o usa el botón de ubicación</p>`;
-                    return;
-                }
-            } else {
-                origen = origen.formatted_address;
+            // 👉 VALIDACIÓN CLAVE: Obtener destino correctamente
+            const lugarDestino = autocompleteDestino.getPlace();
+            if (!lugarDestino || !lugarDestino.formatted_address || !lugarDestino.geometry) {
+                resultado.innerHTML = "<p style='color:red;'>⚠️ Selecciona un destino de la lista de sugerencias.</p>";
+                return;
             }
+            const destino = lugarDestino.formatted_address;
 
+            // Si llegamos aquí, los datos son válidos
             estado.textContent = "🔄 Calculando ruta...";
             estado.style.background = "#fff3e0";
             estado.style.color = "#e65100";
             resultado.innerHTML = "<p>Procesando solicitud...</p>";
 
-            // ✅ SOLICITUD COMPLETA Y CORRECTA
             const solicitud = {
                 origin: origen,
-                destination: destino.formatted_address,
+                destination: destino,
                 travelMode: google.maps.TravelMode.TRANSIT,
                 provideRouteAlternatives: true,
                 transitOptions: {
@@ -199,52 +185,47 @@
                     routingPreference: google.maps.TransitRoutingPreference.FEWER_TRANSFERS
                 },
                 unitSystem: google.maps.UnitSystem.METRIC,
-                region: 'pe' // ✅ Importante: forzamos región Perú
+                region: "pe" // Importante: limita búsqueda a Perú
             };
 
-            // ✅ MANEJO DE ERRORES COMPLETO
             directionsService.route(solicitud, (respuesta, estadoRuta) => {
-                console.log("Respuesta:", respuesta, "Estado:", estadoRuta); // Para ver en consola
-
                 if (estadoRuta === "OK") {
-                    if (respuesta.routes.length === 0) {
-                        resultado.innerHTML = `<p class="error">❌ Google Maps no tiene datos de transporte público entre estos puntos</p>`;
-                        estado.textContent = "⚠️ Sin rutas disponibles";
-                        estado.style.background = "#fff3e0";
-                        estado.style.color = "#e65100";
-                        return;
-                    }
-
                     directionsRenderer.setDirections(respuesta);
                     mostrarResultados(respuesta);
                     estado.textContent = "✅ Ruta encontrada";
                     estado.style.background = "#e8f5e9";
                     estado.style.color = "#1b5e20";
                 } else {
-                    let mensajeError = "";
+                    let mensajeError = "❌ No se pudo calcular la ruta: ";
+                    let colorFondo = "#ffebee";
+                    let colorTexto = "#b71c1c";
+                    
                     switch(estadoRuta) {
                         case "NOT_FOUND": 
-                            mensajeError = "❌ No se encontró una de las direcciones. Escríbela más completa y selecciónala de la lista."; 
+                            mensajeError += "Una de las direcciones no existe o no se encuentra en la base de datos."; 
                             break;
                         case "ZERO_RESULTS": 
-                            mensajeError = "❌ No hay rutas de transporte público entre estos dos puntos (solo hay caminos o autos)."; 
+                            mensajeError += "No hay rutas de transporte público entre esos puntos o no cubrimos esa zona."; 
                             break;
                         case "OVER_QUERY_LIMIT": 
-                            mensajeError = "❌ Límite de consultas excedido o falta activar facturación en Google Cloud."; 
+                            mensajeError += "Has superado el límite de consultas diarias de Google."; 
                             break;
                         case "REQUEST_DENIED": 
-                            mensajeError = "❌ CLAVE API INVÁLIDA o SERVICIOS NO ACTIVADOS. Revisa: 1) Que la clave esté bien escrita 2) Que hayas activado Directions API, Places API, Geocoding API."; 
+                            mensajeError += "CLAVE API INVÁLIDA o servicios NO ACTIVADOS. Ve a la consola de Google Cloud y verifica:";
+                            mensajeError += "<br>1. Que hayas activado Directions API, Geocoding API y Places API.";
+                            mensajeError += "<br>2. Que tu clave tenga restricciones correctas.";
                             break;
-                        case "INVALID_REQUEST": 
-                            mensajeError = "❌ Datos inválidos. Asegúrate de seleccionar las direcciones de la lista desplegable."; 
+                        case "INVALID_REQUEST":
+                            mensajeError += "Faltan datos en la solicitud.";
                             break;
                         default: 
-                            mensajeError = `❌ Error desconocido: ${estadoRuta}`;
+                            mensajeError += "Error: " + estadoRuta;
                     }
-                    resultado.innerHTML = `<p class="error">${mensajeError}</p>`;
-                    estado.textContent = "❌ Error al calcular";
-                    estado.style.background = "#ffebee";
-                    estado.style.color = "#b71c1c";
+                    
+                    resultado.innerHTML = `<p style="color:${colorTexto}; padding:10px; background:${colorFondo}; border-radius:4px;">${mensajeError}</p>`;
+                    estado.textContent = "⚠️ Error al buscar ruta";
+                    estado.style.background = colorFondo;
+                    estado.style.color = colorTexto;
                 }
             });
         }
@@ -302,7 +283,7 @@
         }
     </script>
 
-    <!-- ✅ LIBRERÍAS COMPLETAS: FALTABA DIRECTIONS ANTES -->
+    <!-- 👇 IMPORTANTE: CAMBIA ESTA CLAVE POR UNA QUE TENGAS CONFIGURADA BIEN -->
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places,geocoding,directions&callback=initMap" async defer></script>
 </body>
 </html>
