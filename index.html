@@ -11,7 +11,7 @@
         input {width:100%; padding:10px; margin:5px 0; border:1px solid #ccc; border-radius:4px;}
         button {width:100%; padding:10px; margin:5px 0; background:#1a73e8; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:15px;}
         .btn-verde {background:#34a853; margin-bottom:10px;}
-        #map {flex:1;}
+        #map {flex:1; min-height:400px;}
         #resultados {margin-top:10px; max-height:220px; overflow-y:auto; font-size:14px;}
         .ruta {padding:8px; margin:5px 0; background:#fff; border-radius:4px; border-left:4px solid #1a73e8;}
         .error {color:#d93025; padding:8px; background:#fce8e6; border-radius:4px; margin:5px 0;}
@@ -46,51 +46,31 @@
                 suppressMarkers: false
             });
 
-            // Autocompletar SOLO Perú
-            new google.maps.places.Autocomplete(document.getElementById("origen"), {
-                componentRestrictions: {country: "PE"}
-            });
-            new google.maps.places.Autocomplete(document.getElementById("destino"), {
-                componentRestrictions: {country: "PE"}
-            });
+            new google.maps.places.Autocomplete(document.getElementById("origen"), {componentRestrictions: {country: "PE"}});
+            new google.maps.places.Autocomplete(document.getElementById("destino"), {componentRestrictions: {country: "PE"}});
         }
 
-        // 📍 Ubicación actual
         function usarUbicacionActual() {
-            if (!navigator.geolocation) {
-                alert("Tu navegador no admite ubicación");
-                return;
-            }
+            if (!navigator.geolocation) return alert("No admite ubicación");
             navigator.geolocation.getCurrentPosition(
-                (posicion) => {
-                    const lat = posicion.coords.latitude;
-                    const lng = posicion.coords.longitude;
-                    const ubicacion = {lat, lng};
-                    new google.maps.Geocoder().geocode({location: ubicacion, region: "PE"}, (res, estado) => {
-                        if (estado === "OK" && res[0]) {
-                            document.getElementById("origen").value = res[0].formatted_address;
-                            map.setCenter(ubicacion);
-                        } else {
-                            document.getElementById("origen").value = `${lat}, ${lng}`;
-                        }
+                (pos) => {
+                    const ubi = {lat: pos.coords.latitude, lng: pos.coords.longitude};
+                    new google.maps.Geocoder().geocode({location: ubi, region:"PE"}, (res, ok) => {
+                        if (ok === "OK" && res[0]) document.getElementById("origen").value = res[0].formatted_address;
+                        else document.getElementById("origen").value = `${ubi.lat}, ${ubi.lng}`;
+                        map.setCenter(ubi);
                     });
                 },
-                (error) => alert(error.code===1?"Permiso denegado":"No se pudo obtener ubicación"),
+                () => alert("Permiso denegado o error"),
                 {enableHighAccuracy: true, timeout: 8000}
             );
         }
 
-        // 🚌 CALCULAR RUTA - CORREGIDO PARA LIMA
         function calcularRuta() {
             const origen = document.getElementById("origen").value.trim();
             const destino = document.getElementById("destino").value.trim();
+            if (!origen || !destino) return mostrarError("Completa ambas direcciones");
 
-            if (!origen || !destino) {
-                mostrarError("Completa ambas direcciones");
-                return;
-            }
-
-            // ✅ OBLIGATORIO: aseguramos que sea en Perú
             const origenFinal = origen.includes("Perú") ? origen : origen + ", Lima, Perú";
             const destinoFinal = destino.includes("Perú") ? destino : destino + ", Lima, Perú";
 
@@ -98,25 +78,28 @@
                 origin: origenFinal,
                 destination: destinoFinal,
                 travelMode: google.maps.TravelMode.TRANSIT,
-                // ✅ INCLUIMOS METROPOLITANO, ALIMENTADORES, CORREDORES, BUSES
+                // ✅ CORREGIDO: sin arrivalTime, modos correctos
                 transitOptions: {
-                    modes: ["BUS", "RAIL"],
-                    routingPreference: "FEWER_TRANSFERS",
-                    arrivalTime: new Date(Date.now() + 3600000) // 1 hora desde ahora
+                    modes: ["BUS", "SUBWAY"],
+                    routingPreference: "FEWER_TRANSFERS"
                 },
                 provideRouteAlternatives: true,
                 unitSystem: google.maps.UnitSystem.METRIC,
                 region: "PE",
                 language: "es"
-            }, (respuesta, estado) => {
+            }, (res, estado) => {
                 if (estado === "OK") {
-                    directionsRenderer.setDirections(respuesta);
+                    directionsRenderer.setDirections(res);
                 } else {
-                    let mensaje = "No se encontró ruta";
-                    if (estado === "NOT_FOUND") mensaje = "No se reconoció una de las direcciones → agrega: , Lima, Perú";
-                    if (estado === "REQUEST_DENIED") mensaje = "❌ ERROR: Clave API inválida o falta facturación en Google Cloud";
-                    if (estado === "ZERO_RESULTS") mensaje = "No hay transporte público directo entre estos puntos";
-                    mostrarError(mensaje);
+                    let msg;
+                    switch(estado) {
+                        case "UNKNOWN_ERROR": msg = "❌ ERROR: Falta activar FACTURACIÓN en Google Cloud (es gratis) o clave mal configurada"; break;
+                        case "REQUEST_DENIED": msg = "❌ Clave API inválida o APIs no activadas"; break;
+                        case "NOT_FOUND": msg = "❌ No se reconoció la dirección → agrega: , Lima, Perú"; break;
+                        case "ZERO_RESULTS": msg = "ℹ️ No hay transporte público directo"; break;
+                        default: msg = "Error: " + estado;
+                    }
+                    mostrarError(msg);
                 }
             });
         }
@@ -126,7 +109,7 @@
         }
     </script>
 
-    <!-- ✅ APIs completas: places, geocoding, directions -->
+    <!-- ✅ APIs completas -->
     <script async defer
         src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places,geocoding,directions&callback=initMap&language=es&region=PE">
     </script>
