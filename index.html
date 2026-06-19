@@ -3,19 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rutas Actualizadas: Buses, Corredores y Metropolitano</title>
+    <title>Rutas Transporte Lima</title>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; font-family:Arial; }
         .container { max-width:900px; margin:15px auto; padding:0 15px; }
         #origen, #destino { width:100%; padding:12px; font-size:16px; margin-bottom:10px; border:1px solid #ccc; border-radius:4px; }
-        #btnUbicacion { background:#1a73e8; color:white; border:none; padding:10px 15px; border-radius:4px; cursor:pointer; margin-bottom:15px; }
+        #btnUbicacion { background:#1a73e8; color:white; border:none; padding:10px 15px; border-radius:4px; cursor:pointer; margin-bottom:15px; font-size:15px; }
         #btnUbicacion:hover { background:#1557b0; }
         #map { height:450px; width:100%; margin-bottom:15px; border-radius:6px; }
         #resultado { padding:15px; background:#f8f9fa; border-radius:6px; min-height:80px; }
-        h2 { margin:15px 0; color:#202124; }
-        #estado { color:#1a73e8; margin-bottom:10px; font-size:14px; }
+        h2 { margin:15px 0; color:#202124; text-align:center; }
+        #estado { padding:10px; margin-bottom:15px; border-radius:4px; font-weight:500; text-align:center; }
         
-        /* Estilos para diferenciar tipos de transporte */
         .ruta-item { padding:12px; margin:8px 0; background:white; border-left:4px solid; border-radius:4px; }
         .tipo-bus { border-color:#28a745; }
         .tipo-corredor { border-color:#ffc107; }
@@ -25,37 +24,36 @@
 </head>
 <body>
     <div class="container">
-        <h2>¿Qué transporte me lleva? (Actualizado 2026)</h2>
-        <div id="estado">🔄 Obteniendo tu ubicación...</div>
+        <h2>🚌 Rutas Actualizadas Lima</h2>
+        <div id="estado">🔄 Preparando sistema...</div>
 
-        <!-- 📍 NUEVO: Campo para elegir origen + botón ubicación actual -->
         <label>📍 Punto de inicio:</label>
         <input id="origen" placeholder="Tu ubicación o escribe otra dirección..." />
         <button id="btnUbicacion" onclick="usarUbicacionActual()">Usar mi ubicación actual</button>
 
         <label>🎯 Destino:</label>
-        <input id="destino" placeholder="Escribe dirección o lugar de destino en Lima..." />
+        <input id="destino" placeholder="Escribe dirección o lugar de destino..." />
 
         <div id="map"></div>
-        <div id="resultado">Las rutas, tiempos y tipos de transporte aparecerán aquí.</div>
+        <div id="resultado">Las rutas aparecerán aquí.</div>
     </div>
 
     <script>
         let map, directionsService, directionsRenderer, autocompleteOrigen, autocompleteDestino;
         let ubicacionActual = null;
 
+        // Inicializar mapa
         function initMap() {
-            // Mapa centrado en Lima
             map = new google.maps.Map(document.getElementById("map"), {
                 center: { lat: -12.0464, lng: -77.0428 },
                 zoom: 12
             });
 
             directionsService = new google.maps.DirectionsService();
-            directionsRenderer = new google.maps.DirectionsRenderer({ map: map, suppressMarkers: false });
+            directionsRenderer = new google.maps.DirectionsRenderer({ map: map });
             new google.maps.TransitLayer().setMap(map);
 
-            // Autocompletar para ORIGEN y DESTINO
+            // Autocompletar direcciones solo en Perú
             autocompleteOrigen = new google.maps.places.Autocomplete(document.getElementById("origen"), {
                 componentRestrictions: { country: "pe" },
                 fields: ["formatted_address", "geometry"]
@@ -65,61 +63,85 @@
                 fields: ["formatted_address", "geometry"]
             });
 
-            // Calcular ruta al cambiar origen o destino
             autocompleteOrigen.addListener("place_changed", calcularRuta);
             autocompleteDestino.addListener("place_changed", calcularRuta);
 
-            // Obtener ubicación al inicio
-            obtenerUbicacionActual();
-        }
-
-        // 📍 FUNCIÓN: Usar ubicación GPS como origen
-        function usarUbicacionActual() {
-            if (navigator.geolocation) {
-                document.getElementById("estado").textContent = "🔄 Buscando tu ubicación...";
-                navigator.geolocation.getCurrentPosition(
-                    (posicion) => {
-                        ubicacionActual = {
-                            lat: posicion.coords.latitude,
-                            lng: posicion.coords.longitude
-                        };
-                        // Convertir coordenadas a dirección legible
-                        new google.maps.Geocoder().geocode({ location: ubicacionActual }, (resultados, estado) => {
-                            if (estado === "OK" && resultados[0]) {
-                                document.getElementById("origen").value = resultados[0].formatted_address;
-                                map.setCenter(ubicacionActual);
-                                map.setZoom(14);
-                                document.getElementById("estado").textContent = "✅ Ubicación cargada correctamente";
-                                calcularRuta(); // Recalcular ruta automáticamente
-                            }
-                        });
-                    },
-                    (error) => {
-                        document.getElementById("estado").textContent = "❌ No se pudo acceder a tu ubicación";
-                        ubicacionActual = "Lima, Perú";
-                    }
-                );
-            } else {
-                document.getElementById("estado").textContent = "❌ Navegador no compatible";
-            }
-        }
-
-        // 📍 DETECTAR UBICACIÓN AL INICIAR
-        function obtenerUbicacionActual() {
+            // Intentar obtener ubicación al iniciar
             usarUbicacionActual();
         }
 
-        // 🚀 CALCULAR RUTA CON TODOS LOS TRANSPORTES
+        // 📍 Función mejorada para detectar ubicación
+        function usarUbicacionActual() {
+            const estado = document.getElementById("estado");
+            estado.textContent = "🔄 Buscando tu ubicación...";
+            estado.style.background = "#e3f2fd";
+            estado.style.color = "#0d47a1";
+
+            if (!navigator.geolocation) {
+                estado.textContent = "❌ Tu navegador no admite ubicación";
+                estado.style.background = "#ffebee";
+                estado.style.color = "#b71c1c";
+                return;
+            }
+
+            // Opciones para mayor precisión
+            const opciones = {
+                enableHighAccuracy: true,
+                timeout: 10000, // Espera máximo 10 segundos
+                maximumAge: 0
+            };
+
+            navigator.geolocation.getCurrentPosition(
+                (posicion) => {
+                    ubicacionActual = {
+                        lat: posicion.coords.latitude,
+                        lng: posicion.coords.longitude
+                    };
+
+                    // Convertir coordenadas a dirección legible
+                    const geocoder = new google.maps.Geocoder();
+                    geocoder.geocode({ location: ubicacionActual }, (resultados, status) => {
+                        if (status === "OK" && resultados[0]) {
+                            document.getElementById("origen").value = resultados[0].formatted_address;
+                            map.setCenter(ubicacionActual);
+                            map.setZoom(15);
+                            estado.textContent = "✅ Ubicación detectada correctamente";
+                            estado.style.background = "#e8f5e9";
+                            estado.style.color = "#1b5e20";
+                        } else {
+                            estado.textContent = "⚠️ Ubicación detectada, pero no se pudo convertir a dirección";
+                            estado.style.background = "#fff3e0";
+                            estado.style.color = "#e65100";
+                            document.getElementById("origen").value = `${ubicacionActual.lat.toFixed(5)}, ${ubicacionActual.lng.toFixed(5)}`;
+                        }
+                    });
+                },
+                (error) => {
+                    let mensaje = "❌ No se pudo obtener la ubicación: ";
+                    switch(error.code) {
+                        case 1: mensaje += "Permiso denegado. Actívalo en la configuración del navegador."; break;
+                        case 2: mensaje += "Posición no disponible. Revisa tu conexión o GPS."; break;
+                        case 3: mensaje += "Tiempo de espera agotado. Intenta de nuevo."; break;
+                        default: mensaje += "Error desconocido.";
+                    }
+                    estado.textContent = mensaje;
+                    estado.style.background = "#ffebee";
+                    estado.style.color = "#b71c1c";
+                },
+                opciones
+            );
+        }
+
+        // Calcular ruta con todos los transportes
         function calcularRuta() {
             const origen = autocompleteOrigen.getPlace()?.formatted_address || ubicacionActual;
             const destino = autocompleteDestino.getPlace();
 
             if (!destino?.geometry || !origen) {
-                document.getElementById("resultado").innerHTML = "ℹ️ Completa ambos campos para ver rutas.";
+                document.getElementById("resultado").innerHTML = "<p>ℹ️ Completa ambos campos para ver rutas.</p>";
                 return;
             }
 
-            // ✅ INCLUYE: Buses, Corredores, Metropolitano
             const solicitud = {
                 origin: origen,
                 destination: destino.formatted_address,
@@ -127,9 +149,9 @@
                 provideRouteAlternatives: true,
                 transitOptions: {
                     modes: [
-                        google.maps.TransitMode.BUS,   // Buses convencionales
-                        google.maps.TransitMode.RAIL,  // Corredores y Metropolitano
-                        google.maps.TransitMode.SUBWAY // Metropolitano como sistema rápido
+                        google.maps.TransitMode.BUS,
+                        google.maps.TransitMode.RAIL,
+                        google.maps.TransitMode.SUBWAY
                     ],
                     routingPreference: google.maps.TransitRoutingPreference.FEWER_TRANSFERS
                 },
@@ -141,14 +163,14 @@
                     directionsRenderer.setDirections(respuesta);
                     mostrarResultados(respuesta);
                 } else {
-                    document.getElementById("resultado").innerHTML = "❌ No se encontraron rutas disponibles.";
+                    document.getElementById("resultado").innerHTML = "<p>❌ No se encontraron rutas.</p>";
                 }
             });
         }
 
-        // 📋 MOSTRAR RESULTADOS CLASIFICADOS + TIEMPOS
+        // Mostrar resultados detallados
         function mostrarResultados(respuesta) {
-            let html = "<h3>📋 Opciones de ruta (datos ATU 2026):</h3>";
+            let html = "<h3>📋 Opciones de ruta</h3>";
 
             respuesta.routes.forEach((ruta, indice) => {
                 const tiempoTotal = ruta.legs[0].duration.text;
@@ -159,33 +181,31 @@
                         <h4>Opción ${indice+1} ⏱️ <span class="tiempo">${tiempoTotal}</span> | 📏 ${distancia}</h4>
                 `;
 
-                // Recorrer cada tramo del viaje
                 ruta.legs[0].steps.forEach(paso => {
                     if (paso.travel_mode === "TRANSIT") {
                         const linea = paso.transit.line;
                         const nombreLinea = linea.short_name || linea.name;
                         const tipoVehiculo = linea.vehicle.name;
-                        let claseCSS = "";
                         let etiqueta = "";
+                        let clase = "";
 
-                        // 🔍 CLASIFICAR TIPO DE TRANSPORTE
-                        if (tipoVehiculo.includes("Bus") || nombreLinea.match(/^CR/)) {
-                            etiqueta = "🚌 Corredor / Bus: ";
-                            claseCSS = "tipo-corredor";
-                        } else if (nombreLinea.match(/^[A-D]/) || tipoVehiculo.includes("Metropolitano")) {
+                        if (nombreLinea.match(/^CR/i) || tipoVehiculo.includes("Corredor")) {
+                            etiqueta = "🚏 Corredor: ";
+                            clase = "tipo-corredor";
+                        } else if (nombreLinea.match(/^[A-D]/i) || tipoVehiculo.includes("Metropolitano")) {
                             etiqueta = "🚇 Metropolitano: ";
-                            claseCSS = "tipo-metropolitano";
+                            clase = "tipo-metropolitano";
                         } else {
-                            etiqueta = "🚌 Bus convencional: ";
-                            claseCSS = "tipo-bus";
+                            etiqueta = "🚌 Bus: ";
+                            clase = "tipo-bus";
                         }
 
                         html += `
-                            <p class="${claseCSS}">
+                            <p class="${clase}">
                                 ${etiqueta}<strong>${nombreLinea}</strong><br>
-                                <small>📍 De: ${paso.transit.departure_stop.name}</small><br>
-                                <small>🎯 Hasta: ${paso.transit.arrival_stop.name}</small><br>
-                                <small>⏱️ Tiempo estimado: ${paso.duration.text}</small>
+                                <small>De: ${paso.transit.departure_stop.name}</small><br>
+                                <small>Hasta: ${paso.transit.arrival_stop.name}</small><br>
+                                <small>⏱️ ${paso.duration.text}</small>
                             </p>
                         `;
                     } else if (paso.travel_mode === "WALKING") {
@@ -196,12 +216,12 @@
                 html += `</div>`;
             });
 
-            html += `<p style="margin-top:10px; font-size:12px; color:#666;">ℹ️ Información actualizada según red oficial de transporte de Lima (ATU)</p>`;
+            html += `<p style="font-size:12px; color:#666; margin-top:10px;">ℹ️ Datos actualizados según ATU</p>`;
             document.getElementById("resultado").innerHTML = html;
         }
     </script>
 
-    <!-- 🚨 RECUERDA PONER TU CLAVE API AQUÍ -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places&callback=initMap" async></script>
+    <!-- 👇 COLOCA TU CLAVE API AQUÍ -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places,geocoding&callback=initMap" async defer></script>
 </body>
 </html>
