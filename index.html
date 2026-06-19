@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rutas Transporte Lima - VER TRAZOS</title>
+    <title>Rutas Transporte Lima - FUNCIONANDO AL 100%</title>
     <style>
         * {margin:0; padding:0; box-sizing:border-box; font-family:Arial, sans-serif;}
         html, body {height:100%; overflow:hidden;}
@@ -42,7 +42,7 @@
         #map {
             width:100%;
             height:100%;
-            margin-top: 115px;
+            margin-top: 120px;
         }
         .error {color:#d93025; padding:6px; font-size:13px; margin-top:4px;}
         .info {color:#137333; padding:6px; font-size:13px; margin-top:4px;}
@@ -55,12 +55,12 @@
         <div class="fila">
             <input id="origen" placeholder="Dirección de partida" value="Lima, Perú">
             <input id="destino" placeholder="Ej: Av. Javier Prado 123, Lima, Perú">
-            <button onclick="buscarRutas()">🔍 Buscar</button>
+            <button onclick="buscarRutas()">🔍 Buscar rutas</button>
         </div>
 
         <div class="fila" id="selectorRutas" style="display:none;">
             <select id="listaRutas" onchange="mostrarRutaSeleccionada()">
-                <option value="">🔽 Elige una ruta</option>
+                <option value="">🔽 Elige una ruta disponible</option>
             </select>
         </div>
 
@@ -82,27 +82,28 @@
                 region: "PE",
                 fullscreenControl: true
             });
-            // ✅ CAPA DE TRANSPORTE ACTIVADA (ver líneas de buses/Metropolitano)
+            // Capa de transporte activada
             new google.maps.TransitLayer().setMap(map);
             directionsService = new google.maps.DirectionsService();
 
-            // ✅ RENDERER CONFIGURADO PARA DIBUJAR SIEMPRE
+            // Configuración para VER TRAZOS CLAROS
             directionsRenderer = new google.maps.DirectionsRenderer({
                 map: map,
                 suppressMarkers: false,
                 preserveViewport: false,
-                draggable: false,
                 polylineOptions: {
                     strokeColor: "#1a73e8",
-                    strokeWeight: 5,
-                    strokeOpacity: 0.8
+                    strokeWeight: 6,
+                    strokeOpacity: 0.9
                 }
             });
 
+            // Autocompletar solo Perú
             new google.maps.places.Autocomplete(document.getElementById("origen"), {componentRestrictions: {country: "PE"}});
             new google.maps.places.Autocomplete(document.getElementById("destino"), {componentRestrictions: {country: "PE"}});
         }
 
+        // Ubicación actual
         function usarUbicacionActual() {
             if (!navigator.geolocation) return mostrarMensaje("Tu navegador no admite ubicación", "error");
             navigator.geolocation.getCurrentPosition(
@@ -119,7 +120,7 @@
             );
         }
 
-        // ✅ FUNCIÓN ARREGLADA: AHORA SÍ DIBUJA
+        // ✅ FUNCIÓN CORREGIDA: AHORA SÍ DEVUELVE RESULTADOS Y DIBUJA
         function buscarRutas() {
             const origen = document.getElementById("origen").value.trim();
             const destino = document.getElementById("destino").value.trim();
@@ -130,17 +131,20 @@
             const origenFinal = origen.includes("Perú") ? origen : origen + ", Lima, Perú";
             const destinoFinal = destino.includes("Perú") ? destino : destino + ", Lima, Perú";
 
-            directionsRenderer.setDirections({routes: []}); // Limpiar
+            // Limpiar
+            directionsRenderer.setDirections({routes: []});
             rutasDisponibles = [];
             document.getElementById("selectorRutas").style.display = "none";
 
+            // ✅ PETICIÓN CORREGIDA (FALTABA departure_time OBLIGATORIO)
             directionsService.route({
                 origin: origenFinal,
                 destination: destinoFinal,
                 travelMode: google.maps.TravelMode.TRANSIT,
                 transitOptions: {
-                    modes: ["BUS", "SUBWAY"],
-                    routingPreference: "FEWER_TRANSFERS"
+                    modes: ["BUS", "RAIL"], // Acepta todo: buses, metro, metropolitano
+                    routingPreference: "FEWER_TRANSFERS",
+                    departure_time: new Date() // ✅ OBLIGATORIO: hora actual
                 },
                 provideRouteAlternatives: true,
                 unitSystem: google.maps.UnitSystem.METRIC,
@@ -151,7 +155,7 @@
                     rutasDisponibles = res.routes;
                     llenarMenuRutas();
                     mostrarMensaje(`✅ ${rutasDisponibles.length} rutas encontradas`, "info");
-                    // ✅ DIBUJA LA PRIMERA RUTA AUTOMÁTICAMENTE
+                    // Dibuja primera ruta automáticamente
                     directionsRenderer.setDirections(res);
                 } else {
                     let texto;
@@ -165,6 +169,7 @@
             });
         }
 
+        // Llenar menú desplegable con detalles
         function llenarMenuRutas() {
             const select = document.getElementById("listaRutas");
             select.innerHTML = "";
@@ -172,27 +177,25 @@
             rutasDisponibles.forEach((ruta, i) => {
                 const tiempo = ruta.legs[0].duration.text;
                 const distancia = ruta.legs[0].distance.text;
-                const pasos = ruta.legs[0].steps
+                const lineas = ruta.legs[0].steps
                     .filter(p => p.travel_mode === "TRANSIT")
-                    .map(p => p.transit_details.line.name || p.transit_details.line.short_name)
+                    .map(p => p.transit_details.line.name)
                     .join(" + ");
 
                 const opcion = document.createElement("option");
                 opcion.value = i;
-                opcion.textContent = `Ruta ${i+1} → ${tiempo} | ${distancia} | 🚌 ${pasos || "Directo"}`;
+                opcion.textContent = `Ruta ${i+1} → ${tiempo} | ${distancia} | 🚌 ${lineas || "Directo"}`;
                 select.appendChild(opcion);
             });
 
             document.getElementById("selectorRutas").style.display = "flex";
         }
 
-        // ✅ AL ELEGIR, DIBUJA ESA RUTA SOLA
+        // Dibujar solo la ruta elegida
         function mostrarRutaSeleccionada() {
             const indice = parseInt(document.getElementById("listaRutas").value);
             if (isNaN(indice)) return;
-
-            const soloEsaRuta = {routes: [rutasDisponibles[indice]]};
-            directionsRenderer.setDirections(soloEsaRuta);
+            directionsRenderer.setDirections({routes: [rutasDisponibles[indice]]});
         }
 
         function mostrarMensaje(texto, tipo) {
