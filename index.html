@@ -3,25 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rutas de Transporte Lima</title>
+    <title>Rutas Transporte Lima</title>
     <style>
         * {margin:0; padding:0; box-sizing:border-box; font-family:Arial, sans-serif;}
         body {display:flex; flex-direction:column; height:100vh;}
         .panel {padding:15px; background:#f8f9fa; border-bottom:1px solid #ddd;}
         input {width:100%; padding:10px; margin:5px 0; border:1px solid #ccc; border-radius:4px;}
         button {width:100%; padding:10px; margin:5px 0; background:#1a73e8; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:15px;}
-        .btn-secundario {background:#34a853; margin-bottom:10px;}
+        .btn-verde {background:#34a853; margin-bottom:10px;}
         #map {flex:1;}
         #resultados {margin-top:10px; max-height:220px; overflow-y:auto; font-size:14px;}
         .ruta {padding:8px; margin:5px 0; background:#fff; border-radius:4px; border-left:4px solid #1a73e8;}
+        .error {color:#d93025; padding:8px; background:#fce8e6; border-radius:4px; margin:5px 0;}
     </style>
 </head>
 <body>
     <div class="panel">
-        <button class="btn-secundario" onclick="usarUbicacionActual()">📍 Usar mi ubicación actual</button>
-        <input id="origen" placeholder="Dirección de partida">
-        <input id="destino" placeholder="Dirección de destino" required>
-        <button onclick="calcularRuta()">🔍 Buscar líneas y rutas</button>
+        <button class="btn-verde" onclick="usarUbicacionActual()">📍 Usar mi ubicación actual</button>
+        <input id="origen" placeholder="Dirección de partida" value="Lima, Perú">
+        <input id="destino" placeholder="Ej: Av. Javier Prado 123, Lima, Perú">
+        <button onclick="calcularRuta()">🔍 Buscar rutas</button>
         <div id="resultados"></div>
     </div>
     <div id="map"></div>
@@ -45,7 +46,7 @@
                 suppressMarkers: false
             });
 
-            // Autocompletar direcciones en Perú
+            // Autocompletar SOLO Perú
             new google.maps.places.Autocomplete(document.getElementById("origen"), {
                 componentRestrictions: {country: "PE"}
             });
@@ -54,7 +55,7 @@
             });
         }
 
-        // 📍 Función para obtener ubicación actual
+        // 📍 Ubicación actual
         function usarUbicacionActual() {
             if (!navigator.geolocation) {
                 alert("Tu navegador no admite ubicación");
@@ -65,58 +66,69 @@
                     const lat = posicion.coords.latitude;
                     const lng = posicion.coords.longitude;
                     const ubicacion = {lat, lng};
-                    // Convertir coordenadas a dirección legible
-                    new google.maps.Geocoder().geocode({location: ubicacion}, (resultados, estado) => {
-                        if (estado === "OK" && resultados[0]) {
-                            document.getElementById("origen").value = resultados[0].formatted_address;
+                    new google.maps.Geocoder().geocode({location: ubicacion, region: "PE"}, (res, estado) => {
+                        if (estado === "OK" && res[0]) {
+                            document.getElementById("origen").value = res[0].formatted_address;
                             map.setCenter(ubicacion);
                         } else {
                             document.getElementById("origen").value = `${lat}, ${lng}`;
                         }
                     });
                 },
-                (error) => {
-                    let mensaje = "No se pudo obtener tu ubicación";
-                    if (error.code === 1) mensaje = "Permiso denegado para acceder a la ubicación";
-                    alert(mensaje);
-                },
+                (error) => alert(error.code===1?"Permiso denegado":"No se pudo obtener ubicación"),
                 {enableHighAccuracy: true, timeout: 8000}
             );
         }
 
-        // 🚌 Calcular ruta en transporte público
+        // 🚌 CALCULAR RUTA - CORREGIDO PARA LIMA
         function calcularRuta() {
             const origen = document.getElementById("origen").value.trim();
             const destino = document.getElementById("destino").value.trim();
+
             if (!origen || !destino) {
-                alert("Completa tanto el origen como el destino");
+                mostrarError("Completa ambas direcciones");
                 return;
             }
 
+            // ✅ OBLIGATORIO: aseguramos que sea en Perú
+            const origenFinal = origen.includes("Perú") ? origen : origen + ", Lima, Perú";
+            const destinoFinal = destino.includes("Perú") ? destino : destino + ", Lima, Perú";
+
             directionsService.route({
-                origin: origen,
-                destination: destino,
+                origin: origenFinal,
+                destination: destinoFinal,
                 travelMode: google.maps.TravelMode.TRANSIT,
+                // ✅ INCLUIMOS METROPOLITANO, ALIMENTADORES, CORREDORES, BUSES
                 transitOptions: {
                     modes: ["BUS", "RAIL"],
-                    routingPreference: "FEWER_TRANSFERS"
+                    routingPreference: "FEWER_TRANSFERS",
+                    arrivalTime: new Date(Date.now() + 3600000) // 1 hora desde ahora
                 },
                 provideRouteAlternatives: true,
                 unitSystem: google.maps.UnitSystem.METRIC,
-                region: "PE"
+                region: "PE",
+                language: "es"
             }, (respuesta, estado) => {
                 if (estado === "OK") {
                     directionsRenderer.setDirections(respuesta);
                 } else {
-                    alert("No se encontró ruta: " + estado);
+                    let mensaje = "No se encontró ruta";
+                    if (estado === "NOT_FOUND") mensaje = "No se reconoció una de las direcciones → agrega: , Lima, Perú";
+                    if (estado === "REQUEST_DENIED") mensaje = "❌ ERROR: Clave API inválida o falta facturación en Google Cloud";
+                    if (estado === "ZERO_RESULTS") mensaje = "No hay transporte público directo entre estos puntos";
+                    mostrarError(mensaje);
                 }
             });
         }
+
+        function mostrarError(texto) {
+            document.getElementById("resultados").innerHTML = `<div class="error">${texto}</div>`;
+        }
     </script>
 
-    <!-- Reemplaza TU_CLAVE_API por la que generaste en Google Cloud -->
+    <!-- ✅ APIs completas: places, geocoding, directions -->
     <script async defer
-        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places,geocoding&callback=initMap&language=es&region=PE">
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places,geocoding,directions&callback=initMap&language=es&region=PE">
     </script>
 </body>
 </html>
