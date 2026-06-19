@@ -3,287 +3,180 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rutas Transporte Lima</title>
+    <title>Rutas de Transporte - Lima</title>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; font-family:Arial; }
         .container { max-width:900px; margin:15px auto; padding:0 15px; }
-        #origen, #destino { width:100%; padding:12px; font-size:16px; margin-bottom:10px; border:1px solid #ccc; border-radius:4px; }
-        #btnUbicacion { background:#1a73e8; color:white; border:none; padding:10px 15px; border-radius:4px; cursor:pointer; margin-bottom:15px; font-size:15px; }
-        #btnUbicacion:hover { background:#1557b0; }
-        #map { height:450px; width:100%; margin-bottom:15px; border-radius:6px; }
-        #resultado { padding:15px; background:#f8f9fa; border-radius:6px; min-height:80px; }
+        .input-group { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+        #origen, #destino { flex:1; min-width:250px; padding:12px; font-size:16px; border:1px solid #ccc; border-radius:4px; }
+        #btn-ubicacion { padding:12px 15px; background:#1a73e8; color:white; border:none; border-radius:4px; cursor:pointer; font-size:15px; }
+        #map { height:480px; width:100%; margin-bottom:15px; border-radius:6px; }
+        #resultado { padding:15px; background:#f8f9fa; border-radius:6px; min-height:100px; line-height:1.6; }
         h2 { margin:15px 0; color:#202124; text-align:center; }
-        #estado { padding:10px; margin-bottom:15px; border-radius:4px; font-weight:500; text-align:center; }
-        
-        .ruta-item { padding:12px; margin:8px 0; background:white; border-left:4px solid; border-radius:4px; }
-        .tipo-bus { border-color:#28a745; }
-        .tipo-corredor { border-color:#ffc107; }
-        .tipo-metropolitano { border-color:#dc3545; }
-        .tiempo { font-weight:bold; color:#28a745; }
+        .ruta { margin:12px 0; padding:12px; background:#fff; border-radius:4px; border-left:4px solid #1a73e8; }
+        .hora { font-weight:bold; color:#2e7d32; }
+        .linea { font-weight:bold; color:#d93025; }
+        .corredor { background:#e8f0fe; padding:2px 6px; border-radius:3px; font-size:0.9em; }
+        .metropolitano { background:#fce8e6; padding:2px 6px; border-radius:3px; font-size:0.9em; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>🚌 Rutas Actualizadas Lima</h2>
-        <div id="estado">🔄 Preparando sistema...</div>
+        <h2>¿Qué transporte me lleva?</h2>
 
-        <label>📍 Punto de inicio:</label>
-        <input id="origen" placeholder="Tu ubicación o escribe otra dirección..." />
-        <button id="btnUbicacion" onclick="usarUbicacionActual()">Usar mi ubicación actual</button>
-
-        <label>🎯 Destino:</label>
-        <input id="destino" placeholder="Escribe dirección o lugar de destino..." />
+        <div class="input-group">
+            <input id="origen" placeholder="Dirección de inicio..." />
+            <button id="btn-ubicacion">📍 Usar mi ubicación</button>
+            <input id="destino" placeholder="Dirección de destino..." />
+        </div>
 
         <div id="map"></div>
-        <div id="resultado">Las rutas aparecerán aquí.</div>
+        <div id="resultado">Escribe o selecciona el punto de partida y el destino para ver las rutas.</div>
     </div>
 
     <script>
         let map, directionsService, directionsRenderer, autocompleteOrigen, autocompleteDestino;
-        let ubicacionActual = null;
 
-        // Inicializar mapa
         function initMap() {
+            // Mapa centrado en Lima
             map = new google.maps.Map(document.getElementById("map"), {
                 center: { lat: -12.0464, lng: -77.0428 },
                 zoom: 12
             });
 
+            // Servicios de rutas
             directionsService = new google.maps.DirectionsService();
             directionsRenderer = new google.maps.DirectionsRenderer({ map: map });
-            new google.maps.TransitLayer().setMap(map);
 
-            // Autocompletar direcciones solo en Perú
+            // Capas: transporte público + tráfico en tiempo real
+            new google.maps.TransitLayer().setMap(map);
+            new google.maps.TrafficLayer().setMap(map);
+
+            // Autocompletado para origen y destino
             autocompleteOrigen = new google.maps.places.Autocomplete(document.getElementById("origen"), {
                 componentRestrictions: { country: "pe" },
-                fields: ["formatted_address", "geometry", "name"]
+                fields: ["formatted_address", "geometry"]
             });
+
             autocompleteDestino = new google.maps.places.Autocomplete(document.getElementById("destino"), {
                 componentRestrictions: { country: "pe" },
-                fields: ["formatted_address", "geometry", "name"]
+                fields: ["formatted_address", "geometry"]
             });
 
-            // Evento al seleccionar lugar
-            autocompleteOrigen.addListener("place_changed", () => {
-                const lugar = autocompleteOrigen.getPlace();
-                if (lugar.geometry) calcularRuta();
-            });
-            autocompleteDestino.addListener("place_changed", () => {
-                const lugar = autocompleteDestino.getPlace();
-                if (lugar.geometry) calcularRuta();
-            });
-
-            // Intentar obtener ubicación al iniciar
-            usarUbicacionActual();
-            document.getElementById("estado").textContent = "✅ Sistema listo";
-            document.getElementById("estado").style.background = "#e8f5e9";
-            document.getElementById("estado").style.color = "#1b5e20";
+            // Eventos
+            autocompleteOrigen.addListener("place_changed", buscarRuta);
+            autocompleteDestino.addListener("place_changed", buscarRuta);
+            document.getElementById("btn-ubicacion").addEventListener("click", usarUbicacionActual);
         }
 
-        // 📍 Función mejorada para detectar ubicación
+        // 📍 Función para obtener ubicación actual
         function usarUbicacionActual() {
-            const estado = document.getElementById("estado");
-            estado.textContent = "🔄 Buscando tu ubicación...";
-            estado.style.background = "#e3f2fd";
-            estado.style.color = "#0d47a1";
-
             if (!navigator.geolocation) {
-                estado.textContent = "❌ Tu navegador no admite ubicación";
-                estado.style.background = "#ffebee";
-                estado.style.color = "#b71c1c";
+                alert("❌ Tu navegador no soporta ubicación.");
                 return;
             }
 
-            const opciones = {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            };
-
             navigator.geolocation.getCurrentPosition(
                 (posicion) => {
-                    ubicacionActual = {
-                        lat: posicion.coords.latitude,
-                        lng: posicion.coords.longitude
-                    };
+                    const lat = posicion.coords.latitude;
+                    const lng = posicion.coords.longitude;
+                    const ubicacionActual = new google.maps.LatLng(lat, lng);
 
-                    const geocoder = new google.maps.Geocoder();
-                    geocoder.geocode({ location: ubicacionActual }, (resultados, status) => {
-                        if (status === "OK" && resultados[0]) {
+                    // Centrar mapa en tu ubicación
+                    map.setCenter(ubicacionActual);
+                    map.setZoom(15);
+
+                    // Convertir coordenadas a dirección legible
+                    new google.maps.Geocoder().geocode({ location: ubicacionActual }, (resultados, estado) => {
+                        if (estado === "OK" && resultados[0]) {
                             document.getElementById("origen").value = resultados[0].formatted_address;
-                            map.setCenter(ubicacionActual);
-                            map.setZoom(15);
-                            estado.textContent = "✅ Ubicación detectada correctamente";
-                            estado.style.background = "#e8f5e9";
-                            estado.style.color = "#1b5e20";
+                            buscarRuta(); // Buscar ruta automáticamente
                         } else {
-                            estado.textContent = "⚠️ Ubicación detectada, pero no se pudo convertir a dirección";
-                            estado.style.background = "#fff3e0";
-                            estado.style.color = "#e65100";
-                            document.getElementById("origen").value = `${ubicacionActual.lat.toFixed(5)}, ${ubicacionActual.lng.toFixed(5)}`;
+                            document.getElementById("origen").value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                            buscarRuta();
                         }
                     });
                 },
                 (error) => {
-                    let mensaje = "❌ No se pudo obtener la ubicación: ";
-                    switch(error.code) {
-                        case 1: mensaje += "Permiso denegado. Actívalo en la configuración del navegador."; break;
-                        case 2: mensaje += "Posición no disponible. Revisa tu conexión o GPS."; break;
-                        case 3: mensaje += "Tiempo de espera agotado. Intenta de nuevo."; break;
-                        default: mensaje += "Error desconocido.";
-                    }
-                    estado.textContent = mensaje;
-                    estado.style.background = "#ffebee";
-                    estado.style.color = "#b71c1c";
+                    alert("❌ No se pudo obtener tu ubicación: " + error.message);
                 },
-                opciones
+                { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
             );
         }
 
-        // Calcular ruta con manejo de errores MEJORADO
-        function calcularRuta() {
-            const estado = document.getElementById("estado");
-            const resultado = document.getElementById("resultado");
-            
-            // 👉 VALIDACIÓN CLAVE: Obtener origen correctamente
-            let origen;
-            const lugarOrigen = autocompleteOrigen.getPlace();
-            if (lugarOrigen && lugarOrigen.formatted_address) {
-                origen = lugarOrigen.formatted_address;
-            } else if (ubicacionActual) {
-                origen = ubicacionActual; // Usamos coordenadas si no hay dirección
-            } else {
-                resultado.innerHTML = "<p style='color:red;'>⚠️ Selecciona o escribe un punto de inicio válido.</p>";
-                return;
-            }
+        function buscarRuta() {
+            const origenTxt = document.getElementById("origen").value.trim();
+            const destinoTxt = document.getElementById("destino").value.trim();
 
-            // 👉 VALIDACIÓN CLAVE: Obtener destino correctamente
-            const lugarDestino = autocompleteDestino.getPlace();
-            if (!lugarDestino || !lugarDestino.formatted_address || !lugarDestino.geometry) {
-                resultado.innerHTML = "<p style='color:red;'>⚠️ Selecciona un destino de la lista de sugerencias.</p>";
-                return;
-            }
-            const destino = lugarDestino.formatted_address;
-
-            // Si llegamos aquí, los datos son válidos
-            estado.textContent = "🔄 Calculando ruta...";
-            estado.style.background = "#fff3e0";
-            estado.style.color = "#e65100";
-            resultado.innerHTML = "<p>Procesando solicitud...</p>";
+            if (!origenTxt || !destinoTxt) return;
 
             const solicitud = {
-                origin: origen,
-                destination: destino,
+                origin: origenTxt,
+                destination: destinoTxt,
                 travelMode: google.maps.TravelMode.TRANSIT,
                 provideRouteAlternatives: true,
+                departureTime: new Date(), // Hora actual para datos en tiempo real
                 transitOptions: {
-                    modes: [
-                        google.maps.TransitMode.BUS,
-                        google.maps.TransitMode.RAIL,
-                        google.maps.TransitMode.SUBWAY
-                    ],
-                    routingPreference: google.maps.TransitRoutingPreference.FEWER_TRANSFERS
-                },
-                unitSystem: google.maps.UnitSystem.METRIC,
-                region: "pe" // Importante: limita búsqueda a Perú
+                    modes: ["BUS", "SUBWAY", "RAIL"], // Incluye autobuses, corredores y Metropolitano
+                    routingPreference: google.maps.TransitRoutingPreference.LESS_WALKING
+                }
             };
 
-            directionsService.route(solicitud, (respuesta, estadoRuta) => {
-                if (estadoRuta === "OK") {
+            directionsService.route(solicitud, (respuesta, estado) => {
+                if (estado === google.maps.DirectionsStatus.OK) {
                     directionsRenderer.setDirections(respuesta);
                     mostrarResultados(respuesta);
-                    estado.textContent = "✅ Ruta encontrada";
-                    estado.style.background = "#e8f5e9";
-                    estado.style.color = "#1b5e20";
                 } else {
-                    let mensajeError = "❌ No se pudo calcular la ruta: ";
-                    let colorFondo = "#ffebee";
-                    let colorTexto = "#b71c1c";
-                    
-                    switch(estadoRuta) {
-                        case "NOT_FOUND": 
-                            mensajeError += "Una de las direcciones no existe o no se encuentra en la base de datos."; 
-                            break;
-                        case "ZERO_RESULTS": 
-                            mensajeError += "No hay rutas de transporte público entre esos puntos o no cubrimos esa zona."; 
-                            break;
-                        case "OVER_QUERY_LIMIT": 
-                            mensajeError += "Has superado el límite de consultas diarias de Google."; 
-                            break;
-                        case "REQUEST_DENIED": 
-                            mensajeError += "CLAVE API INVÁLIDA o servicios NO ACTIVADOS. Ve a la consola de Google Cloud y verifica:";
-                            mensajeError += "<br>1. Que hayas activado Directions API, Geocoding API y Places API.";
-                            mensajeError += "<br>2. Que tu clave tenga restricciones correctas.";
-                            break;
-                        case "INVALID_REQUEST":
-                            mensajeError += "Faltan datos en la solicitud.";
-                            break;
-                        default: 
-                            mensajeError += "Error: " + estadoRuta;
-                    }
-                    
-                    resultado.innerHTML = `<p style="color:${colorTexto}; padding:10px; background:${colorFondo}; border-radius:4px;">${mensajeError}</p>`;
-                    estado.textContent = "⚠️ Error al buscar ruta";
-                    estado.style.background = colorFondo;
-                    estado.style.color = colorTexto;
+                    document.getElementById("resultado").innerHTML = "❌ No se encontraron rutas. Revisa las direcciones.";
                 }
             });
         }
 
-        // Mostrar resultados detallados
         function mostrarResultados(respuesta) {
-            let html = "<h3>📋 Opciones de ruta</h3>";
+            let html = "<h3>🚌 Rutas disponibles:</h3>";
 
-            respuesta.routes.forEach((ruta, indice) => {
-                const tiempoTotal = ruta.legs[0].duration.text;
-                const distancia = ruta.legs[0].distance.text;
+            respuesta.routes.forEach((ruta, i) => {
+                const tramo = ruta.legs[0];
+                const duracion = tramo.duration.text;
+                const horaSalida = tramo.departure_time?.text || "Ahora";
+                const horaLlegada = tramo.arrival_time?.text || "Sin dato";
 
-                html += `
-                    <div class="ruta-item">
-                        <h4>Opción ${indice+1} ⏱️ <span class="tiempo">${tiempoTotal}</span> | 📏 ${distancia}</h4>
-                `;
+                html += `<div class="ruta">
+                    <strong>Opción ${i + 1}</strong><br>
+                    ⏱️ Duración: ${duracion}<br>
+                    🕒 Salida: ${horaSalida} | <span class="hora">Llegada estimada: ${horaLlegada}</span><br>
+                    📍 Desde: ${tramo.start_address}<br>
+                    📍 Hasta: ${tramo.end_address}<br><br>`;
 
-                ruta.legs[0].steps.forEach(paso => {
+                tramo.steps.forEach(paso => {
                     if (paso.travel_mode === "TRANSIT") {
-                        const linea = paso.transit.line;
-                        const nombreLinea = linea.short_name || linea.name;
-                        const tipoVehiculo = linea.vehicle.name;
-                        let etiqueta = "";
-                        let clase = "";
+                        const detalle = paso.transitDetails;
+                        const linea = detalle.line;
+                        const tipo = linea.vehicle.name;
 
-                        if (nombreLinea.match(/^CR/i) || tipoVehiculo.includes("Corredor")) {
-                            etiqueta = "🚏 Corredor: ";
-                            clase = "tipo-corredor";
-                        } else if (nombreLinea.match(/^[A-D]/i) || tipoVehiculo.includes("Metropolitano")) {
-                            etiqueta = "🚇 Metropolitano: ";
-                            clase = "tipo-metropolitano";
-                        } else {
-                            etiqueta = "🚌 Bus: ";
-                            clase = "tipo-bus";
+                        let etiqueta = "";
+                        if (tipo.includes("Metropolitano") || linea.name.includes("Metropolitano")) {
+                            etiqueta = `<span class="metropolitano">Metropolitano</span> `;
+                        } else if (tipo.includes("Corredor") || linea.name.includes("Corredor")) {
+                            etiqueta = `<span class="corredor">Corredor</span> `;
                         }
 
-                        html += `
-                            <p class="${clase}">
-                                ${etiqueta}<strong>${nombreLinea}</strong><br>
-                                <small>De: ${paso.transit.departure_stop.name}</small><br>
-                                <small>Hasta: ${paso.transit.arrival_stop.name}</small><br>
-                                <small>⏱️ ${paso.duration.text}</small>
-                            </p>
-                        `;
+                        html += `🔹 ${etiqueta}<span class="linea">${linea.short_name || linea.name}</span> (${tipo})<br>
+                        &nbsp;&nbsp;Parada: ${detalle.departure_stop.name} → ${detalle.arrival_stop.name}<br>
+                        &nbsp;&nbsp;Salida: ${detalle.departure_time.text} | Llegada: ${detalle.arrival_time.text}<br><br>`;
                     } else if (paso.travel_mode === "WALKING") {
-                        html += `<p>🚶 Caminar: ${paso.duration.text} (${paso.distance.text})</p>`;
+                        html += `🚶 Caminar ${paso.distance.text} (${paso.duration.text})<br><br>`;
                     }
                 });
 
                 html += `</div>`;
             });
 
-            html += `<p style="font-size:12px; color:#666; margin-top:10px;">ℹ️ Datos proporcionados por Google Maps</p>`;
-            document.getElementById("resultado").innerHTML = html;
+            document.getElementById("resultado").innerHTML = html || "ℹ️ No hay transporte público disponible para este trayecto.";
         }
     </script>
 
-    <!-- 👇 IMPORTANTE: CAMBIA ESTA CLAVE POR UNA QUE TENGAS CONFIGURADA BIEN -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places,geocoding,directions&callback=initMap" async defer></script>
+    <!-- Reemplaza TU_CLAVE_API_AQUI con tu clave de Google Maps -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places,geocoding&callback=initMap" async></script>
 </body>
 </html>
