@@ -3,30 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rutas Transporte Lima</title>
+    <title>Rutas Actualizadas Metropolitano - Lima Norte</title>
     <style>
-        * { margin:0; padding:0; box-sizing:border-box; font-family:Arial, sans-serif; }
-        body { display:flex; flex-direction:column; height:100vh; }
-        .panel { padding:12px; background:#f8f9fa; border-bottom:1px solid #ddd; }
-        .campo { margin:8px 0; display:flex; gap:8px; flex-wrap:wrap; }
-        input { flex:1; min-width:220px; padding:10px; border:1px solid #ccc; border-radius:4px; font-size:15px; }
-        button { padding:10px 16px; border:none; border-radius:4px; cursor:pointer; font-weight:bold; }
-        .btn-ubicacion { background:#2196F3; color:white; }
-        .btn-buscar { background:#009E5F; color:white; }
-        #map { flex:1; width:100%; }
-        #resultados { max-height:220px; overflow-y:auto; padding:10px; background:#fff; border-top:1px solid #ddd; font-size:14px; }
-        .ruta { margin:8px 0; padding:8px; border-left:3px solid #009E5F; background:#f7fdf9; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+        body { display: flex; flex-direction: column; height: 100vh; }
+        .panel { padding: 12px; background: #f8f9fa; border-bottom: 1px solid #ddd; }
+        .campo { margin: 8px 0; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        input { flex: 1; min-width: 240px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; }
+        button { padding: 10px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-ubicacion { background: #2196F3; color: white; }
+        .btn-buscar { background: #009E5F; color: white; }
+        #map { flex: 1; width: 100%; }
+        #resultados { max-height: 240px; overflow-y: auto; padding: 12px; background: #fff; border-top: 1px solid #ddd; font-size: 14px; }
+        .ruta { margin: 8px 0; padding: 10px; border-left: 4px solid #009E5F; background: #f7fdf9; border-radius: 2px; }
+        .alimentador { border-color: #F57C00; }
+        .metropolitano { border-color: #D32F2F; }
+        h4 { margin-bottom: 6px; color: #222; }
     </style>
 </head>
 <body>
     <div class="panel">
         <div class="campo">
-            <input type="text" id="origen" placeholder="Dirección de partida">
-            <button class="btn-ubicacion" onclick="usarUbicacionActual()">📍 Usar mi ubicación</button>
+            <input type="text" id="origen" placeholder="📍 Punto de partida">
+            <button class="btn-ubicacion" onclick="usarUbicacionActual()">Usar mi ubicación</button>
         </div>
         <div class="campo">
-            <input type="text" id="destino" placeholder="Dirección de destino">
-            <button class="btn-buscar" onclick="calcularRuta()">🔍 Ver rutas</button>
+            <input type="text" id="destino" placeholder="🏁 Dirección de destino">
+            <button class="btn-buscar" onclick="calcularRuta()">🔍 Ver rutas y tiempos</button>
         </div>
     </div>
     <div id="map"></div>
@@ -35,24 +38,63 @@
     <script>
         let mapa, direccionesServicio, renderizadorRuta, autocompletarOrigen, autocompletarDestino;
 
+        // DATOS ACTUALIZADOS 2026 - ALIMENTADORES Y TRONCAL
+        const rutasActualizadas = {
+            alimentadores: {
+                "AN-11 Universitaria": {
+                    nombre: "Alimentador Universitaria",
+                    recorrido: "Paradero Periurbana → Av. Universitaria → Terminal Chimpu Ocllo",
+                    paradas: 11,
+                    horario: "Lunes a Sábado 5:00 - 23:30 | Domingos 5:00 - 22:30",
+                    conexion: "Chimpu Ocllo → Ruta B, Expreso 13"
+                },
+                "AN-09 Carabayllo": {
+                    nombre: "Alimentador Carabayllo",
+                    recorrido: "Zona Carabayllo → Av. Túpac Amaru → Terminal Chimpu Ocllo",
+                    paradas: 14,
+                    horario: "Lunes a Sábado 5:00 - 23:30 | Domingos 5:00 - 22:30",
+                    conexion: "Chimpu Ocllo → Ruta B, Expreso 13"
+                },
+                "AN-19 Torre Blanca": {
+                    nombre: "Alimentador Torre Blanca",
+                    recorrido: "Paradero Torre Blanca → Av. Canta Callao → Terminal Chimpu Ocllo",
+                    paradas: 12,
+                    horario: "Lunes a Sábado 5:00 - 23:30 | Domingos 5:00 - 22:30",
+                    conexion: "Chimpu Ocllo → Ruta B, Expreso 13"
+                },
+                "AN-10 San Juan de Dios": {
+                    nombre: "Alimentador San Juan de Dios",
+                    recorrido: "Puente Piedra → Av. San Juan de Dios → Terminal Chimpu Ocllo",
+                    paradas: 13,
+                    horario: "Lunes a Sábado 5:00 - 23:30 | Domingos 5:00 - 22:30",
+                    conexion: "Chimpu Ocllo → Ruta B, Expreso 13"
+                }
+            },
+            troncal: {
+                "Ruta B": "Terminal Chimpu Ocllo → Naranjal → Central → Matellini",
+                "Expreso 13": "Terminal Chimpu Ocllo → Vía Exclusiva → Estación Central"
+            }
+        };
+
         function iniciarMapa() {
-            // Centro en Lima
-            const lima = { lat: -12.0464, lng: -77.0428 };
+            const limaNorte = { lat: -11.9485, lng: -77.0522 }; // Centro en Chimpu Ocllo
             mapa = new google.maps.Map(document.getElementById("map"), {
-                center: lima,
-                zoom: 13,
-                mapTypeControl: false
+                center: limaNorte,
+                zoom: 12,
+                mapTypeControl: false,
+                transitLayer: new google.maps.TransitLayer() // Capa oficial transporte
             });
+            mapa.transitLayer.setMap(mapa);
 
             direccionesServicio = new google.maps.DirectionsService();
-            renderizadorRuta = new google.maps.DirectionsRenderer({ map: mapa, suppressMarkers: false });
+            renderizadorRuta = new google.maps.DirectionsRenderer({ map: mapa, suppressMarkers: false, preserveViewport: false });
 
-            // Autocompletar direcciones
-            autocompletarOrigen = new google.maps.places.Autocomplete(document.getElementById("origen"));
-            autocompletarDestino = new google.maps.places.Autocomplete(document.getElementById("destino"));
+            // Autocompletado direcciones Perú
+            autocompletarOrigen = new google.maps.places.Autocomplete(document.getElementById("origen"), { componentRestrictions: { country: "pe" } });
+            autocompletarDestino = new google.maps.places.Autocomplete(document.getElementById("destino"), { componentRestrictions: { country: "pe" } });
         }
 
-        // Usar ubicación actual
+        // ✅ Ubicación actual automática
         function usarUbicacionActual() {
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
@@ -60,50 +102,73 @@
                         const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                         new google.maps.Geocoder().geocode({ location: coords }, (res) => {
                             if (res[0]) document.getElementById("origen").value = res[0].formatted_address;
+                            mapa.setCenter(coords);
                         });
                     },
-                    () => alert("No se pudo obtener tu ubicación")
+                    () => alert("❌ No se pudo acceder a tu ubicación"),
+                    { enableHighAccuracy: true }
                 );
-            } else alert("Tu navegador no soporta geolocalización");
+            } else alert("❌ Tu navegador no admite ubicación");
         }
 
-        // Calcular ruta con transporte público
+        // ✅ Calcular ruta con TODOS los medios: buses, alimentadores, corredores, Metropolitano
         function calcularRuta() {
-            const origen = document.getElementById("origen").value;
-            const destino = document.getElementById("destino").value;
-            if (!origen || !destino) return alert("Completa ambos campos");
+            const origen = document.getElementById("origen").value.trim();
+            const destino = document.getElementById("destino").value.trim();
+            if (!origen || !destino) return alert("⚠️ Completa ambos campos");
 
             direccionesServicio.route({
                 origin: origen,
                 destination: destino,
                 travelMode: google.maps.TravelMode.TRANSIT,
-                transitOptions: { modes: ["BUS", "RAIL"], routingPreference: "FEWER_TRANSFERS" }
+                transitOptions: {
+                    modes: ["BUS", "RAIL"],
+                    routingPreference: "FEWER_TRANSFERS",
+                    departureTime: new Date()
+                },
+                region: "pe"
             }, (respuesta, estado) => {
                 if (estado === "OK") {
                     renderizadorRuta.setDirections(respuesta);
-                    mostrarDetallesRuta(respuesta);
+                    mostrarDetallesActualizados(respuesta);
                 } else {
-                    document.getElementById("resultados").innerHTML = "❌ No se encontraron rutas";
+                    document.getElementById("resultados").innerHTML = "<p>❌ No se encontró ruta. Verifica la dirección.</p>";
                 }
             });
         }
 
-        // Mostrar detalles: líneas, tiempos, transbordos
-        function mostrarDetallesRuta(datos) {
-            const rutas = datos.routes[0].legs[0];
-            let html = `<h4>🕒 Duración total: ${rutas.duration.text} | 📏 Distancia: ${rutas.distance.text}</h4>`;
-            html += "<br><strong>🚌 Medios de transporte:</strong><br>";
+        // ✅ Mostrar detalles CON RUTAS NUEVAS ACTUALIZADAS
+        function mostrarDetallesActualizados(datos) {
+            const tramo = datos.routes[0].legs[0];
+            let html = `<h4>🕒 Tiempo total: ${tramo.duration.text} | 📏 Distancia: ${tramo.distance.text}</h4><br>`;
 
-            rutas.steps.forEach(paso => {
+            tramo.steps.forEach(paso => {
                 if (paso.travel_mode === "TRANSIT") {
-                    const tr = paso.transit;
-                    html += `<div class="ruta">
-                        <strong>${tr.line.vehicle.name}:</strong> ${tr.line.name || tr.line.short_name}<br>
-                        Parada: ${tr.departure_stop.name} → ${tr.arrival_stop.name}<br>
-                        Salida: ${tr.departure_time.text} | Llegada: ${tr.arrival_time.text}
+                    const linea = paso.transit.line;
+                    const nombreLinea = linea.name || linea.short_name;
+                    let clase = "";
+                    let infoExtra = "";
+
+                    // DETECTAR Y AGREGAR DATOS DE ALIMENTADORES ACTUALIZADOS
+                    if (rutasActualizadas.alimentadores[nombreLinea]) {
+                        clase = "alimentador";
+                        const datos = rutasActualizadas.alimentadores[nombreLinea];
+                        infoExtra = `<br>📌 Recorrido: ${datos.recorrido}<br>⏱️ Horario: ${datos.horario}<br>🔗 Conexión: ${datos.conexion}`;
+                    }
+                    // DETECTAR TRONCAL METROPOLITANO
+                    else if (nombreLinea.includes("Ruta B") || nombreLinea.includes("Expreso 13") || nombreLinea.includes("Metropolitano")) {
+                        clase = "metropolitano";
+                        if (rutasActualizadas.troncal[nombreLinea]) infoExtra += `<br>🛣️ Troncal: ${rutasActualizadas.troncal[nombreLinea]}`;
+                    }
+
+                    html += `<div class="ruta ${clase}">
+                        <strong>🚌 ${linea.vehicle.name}: ${nombreLinea}</strong><br>
+                        🚏 Parada: ${paso.transit.departure_stop.name} ➜ ${paso.transit.arrival_stop.name}<br>
+                        ⏰ Sale: ${paso.transit.departure_time.text} | Llega: ${paso.transit.arrival_time.text}
+                        ${infoExtra}
                     </div>`;
                 } else if (paso.travel_mode === "WALKING") {
-                    html += `<div>🚶 Caminar: ${paso.duration.text} hasta la parada</div>`;
+                    html += `<div style="margin:4px 0; padding:4px 8px; background:#f1f1f1; border-radius:3px;">🚶 Caminar: ${paso.duration.text}</div>`;
                 }
             });
 
@@ -111,7 +176,7 @@
         }
     </script>
 
-    <!-- Reemplaza TU_CLAVE_AQUI por tu clave real -->
+    <!-- REEMPLAZA AQUÍ TU CLAVE API -->
     <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places&callback=iniciarMapa&language=es&region=PE"></script>
 </body>
 </html>
