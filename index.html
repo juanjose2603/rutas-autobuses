@@ -3,288 +3,129 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rutas Transporte Lima - FUNCIONA PERFECTO</title>
+    <title>Rutas de Transporte Lima</title>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=default"></script>
     <style>
-        * {margin:0; padding:0; box-sizing:border-box; font-family:Arial, sans-serif;}
-        html, body {height:100%; overflow:hidden;}
-
-        .cabecera {
-            position: absolute;
-            top:0; left:0; right:0;
-            z-index: 100;
-            background: #ffffff;
-            padding:12px 15px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-            border-bottom:1px solid #ddd;
-        }
-        .fila {display:flex; gap:8px; flex-wrap:wrap; margin:6px 0;}
-        input, select, button {
-            padding:10px 12px;
-            border:1px solid #ccc;
-            border-radius:4px;
-            font-size:14px;
-        }
-        input {flex:1; min-width:220px;}
-        button {
-            background:#1a73e8;
-            color:white;
-            border:none;
-            cursor:pointer;
-            font-weight:bold;
-        }
-        .btn-verde {background:#34a853;}
-        select {
-            background:#f8f9fa;
-            flex:1;
-            min-width:350px;
-            font-weight:500;
-        }
-        #map {
-            width:100%;
-            height:100%;
-            margin-top: 120px;
-        }
-        .error {color:#d93025; padding:6px; font-size:13px; margin-top:4px;}
-        .info {color:#137333; padding:6px; font-size:13px; margin-top:4px;}
-        .detalle-ruta {font-size:13px; color:#444; margin-top:4px; line-height:1.4;}
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+        body { display: flex; flex-direction: column; height: 100vh; }
+        .panel { padding: 15px; background: #f8f9fa; border-bottom: 1px solid #ddd; }
+        .input-group { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+        input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
+        button { padding: 10px 16px; background: #1a73e8; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; }
+        button:hover { background: #1557b0; }
+        #rutas { margin-top: 12px; max-height: 220px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; background: white; }
+        .ruta-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; }
+        .ruta-item:hover { background: #f1f8ff; }
+        .ruta-titulo { font-weight: bold; color: #202124; margin-bottom: 4px; }
+        .ruta-detalle { font-size: 14px; color: #5f6368; }
+        #map { flex: 1; width: 100%; }
     </style>
 </head>
 <body>
-
-    <div class="cabecera">
-        <button class="btn-verde" onclick="usarUbicacionActual()">📍 Usar mi ubicación</button>
-        <div class="fila">
-            <input id="origen" placeholder="Dirección de partida">
-            <input id="destino" placeholder="Ej: Av. Javier Prado 123, Lima, Perú">
-            <button onclick="buscarRutas()">🔍 Buscar rutas</button>
+    <div class="panel">
+        <div class="input-group">
+            <input id="origen" placeholder="📍 Punto de partida" type="text">
+            <button id="miUbicacion">Usar mi ubicación</button>
         </div>
-
-        <div class="fila" id="selectorRutas" style="display:none;">
-            <select id="listaRutas" onchange="mostrarRutaSeleccionada()">
-                <option value="">🔽 Elige una ruta disponible</option>
-            </select>
+        <div class="input-group">
+            <input id="destino" placeholder="🏁 Dirección de destino" type="text">
+            <button id="buscar">Buscar rutas</button>
         </div>
-
-        <div id="mensaje"></div>
+        <div id="rutas"></div>
     </div>
-
     <div id="map"></div>
 
     <script>
-        let map, marcadorUbicacion, trazoRuta;
-        let rutasDisponibles = [];
-        const LIMA = {lat: -12.0464, lng: -77.0428};
+        let map, directionsService, directionsRenderer, autocompleteOrigen, autocompleteDestino;
 
-        function initMap() {
-            map = new google.maps.Map(document.getElementById("map"), {
-                center: LIMA,
+        async function initMap() {
+            const { Map } = await google.maps.importLibrary("maps");
+            const { DirectionsService, DirectionsRenderer } = await google.maps.importLibrary("routes");
+            const { Autocomplete } = await google.maps.importLibrary("places");
+
+            // Mapa centrado en Lima
+            map = new Map(document.getElementById("map"), {
+                center: { lat: -12.0464, lng: -77.0428 },
                 zoom: 12,
-                language: "es",
-                region: "PE",
-                fullscreenControl: true
+                mapId: "TRANSPORTE_LIMA"
             });
 
-            // Autocompletar direcciones Perú
-            new google.maps.places.Autocomplete(document.getElementById("origen"), {componentRestrictions: {country: "PE"}});
-            new google.maps.places.Autocomplete(document.getElementById("destino"), {componentRestrictions: {country: "PE"}});
+            directionsService = new DirectionsService();
+            directionsRenderer = new DirectionsRenderer({ map: map, suppressPolylines: false });
+
+            // Autocompletar direcciones
+            autocompleteOrigen = new Autocomplete(document.getElementById("origen"), { types: ["geocode"], componentRestrictions: { country: "PE" } });
+            autocompleteDestino = new Autocomplete(document.getElementById("destino"), { types: ["geocode"], componentRestrictions: { country: "PE" } });
+
+            // Botón: usar ubicación actual
+            document.getElementById("miUbicacion").addEventListener("click", () => {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(pos => {
+                        const latlng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                        new google.maps.Geocoder().geocode({ location: latlng }, res => {
+                            if (res[0]) document.getElementById("origen").value = res[0].formatted_address;
+                        });
+                    }, () => alert("No se pudo acceder a tu ubicación"));
+                }
+            });
+
+            // Buscar rutas
+            document.getElementById("buscar").addEventListener("click", buscarRutas);
+            document.getElementById("destino").addEventListener("keydown", e => e.key === "Enter" && buscarRutas());
         }
 
-        // ✅ UBICACIÓN CORREGIDA: AHORA SÍ DETECTA Y CONVIERTE A DIRECCIÓN REAL
-        function usarUbicacionActual() {
-            if (!navigator.geolocation) {
-                mostrarMensaje("❌ Tu navegador no admite ubicación", "error");
-                return;
-            }
-
-            mostrarMensaje("⏳ Buscando tu ubicación...", "info");
-            navigator.geolocation.getCurrentPosition(
-                (posicion) => {
-                    const lat = posicion.coords.latitude;
-                    const lng = posicion.coords.longitude;
-                    const miUbicacion = {lat, lng};
-
-                    // ✅ Convierte coordenadas a dirección exacta
-                    new google.maps.Geocoder().geocode({location: miUbicacion, region:"PE"}, (resultados, estado) => {
-                        if (estado === "OK" && resultados[0]) {
-                            document.getElementById("origen").value = resultados[0].formatted_address;
-                            // Marcador azul en tu ubicación
-                            if (marcadorUbicacion) marcadorUbicacion.setMap(null);
-                            marcadorUbicacion = new google.maps.Marker({
-                                position: miUbicacion,
-                                map: map,
-                                title: "Estás aquí",
-                                icon: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png"
-                            });
-                            map.setCenter(miUbicacion);
-                            map.setZoom(15);
-                            mostrarMensaje("✅ Ubicación detectada correctamente", "info");
-                        } else {
-                            document.getElementById("origen").value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-                            mostrarMensaje("⚠️ Ubicación detectada (coordenadas)", "info");
-                        }
-                    });
-                },
-                (error) => {
-                    let texto = "❌ No se pudo obtener ubicación";
-                    if (error.code === 1) texto = "❌ Permiso denegado. Activa ubicación en tu navegador";
-                    mostrarMensaje(texto, "error");
-                },
-                {enableHighAccuracy: true, timeout: 10000, maximumAge: 0}
-            );
-        }
-
-        // ✅ RUTAS REALES DE LIMA + TRAZOS BIEN DIBUJADOS
         function buscarRutas() {
             const origen = document.getElementById("origen").value.trim();
             const destino = document.getElementById("destino").value.trim();
+            if (!origen || !destino) return alert("Completa origen y destino");
 
-            if (!origen || !destino) {
-                mostrarMensaje("❌ Escribe origen y destino", "error");
-                return;
-            }
-
-            // ✅ RUTAS OFICIALES ACTUALIZADAS 2026 (todas las líneas)
-            rutasDisponibles = [
-                {
-                    id: 1,
-                    nombre: "Corredor Azul + Alimentador 12",
-                    tiempo: "30 - 40 min",
-                    distancia: "6.8 km",
-                    tipo: "🚌 Corredor Azul | 🚏 Alimentador",
-                    detalle: "Toma Corredor Azul hasta Av. Grau → transbordo a Alimentador 12 hasta destino",
-                    color: "#0066CC",
-                    puntos: [
-                        {lat:-12.0464, lng:-77.0428},
-                        {lat:-12.0580, lng:-77.0350},
-                        {lat:-12.0700, lng:-77.0280},
-                        {lat:-12.0820, lng:-77.0200}
-                    ]
-                },
-                {
-                    id: 2,
-                    nombre: "Metropolitano - Expreso Norte-Sur",
-                    tiempo: "22 - 28 min",
-                    distancia: "5.2 km",
-                    tipo: "🚇 Metropolitano",
-                    detalle: "Estación Central → Estación Javier Prado → Directo sin paradas intermedias",
-                    color: "#E30613",
-                    puntos: [
-                        {lat:-12.0464, lng:-77.0428},
-                        {lat:-12.0550, lng:-77.0400},
-                        {lat:-12.0720, lng:-77.0320},
-                        {lat:-12.0850, lng:-77.0250}
-                    ]
-                },
-                {
-                    id: 3,
-                    nombre: "Ruta 201 + Corredor Morado",
-                    tiempo: "40 - 50 min",
-                    distancia: "8.5 km",
-                    tipo: "🚌 Ruta 201 | 🟣 Corredor Morado",
-                    detalle: "Ruta 201 hasta Av. La Marina → Corredor Morado hasta destino",
-                    color: "#7B1FA2",
-                    puntos: [
-                        {lat:-12.0464, lng:-77.0428},
-                        {lat:-12.0380, lng:-77.0500},
-                        {lat:-12.0500, lng:-77.0600},
-                        {lat:-12.0750, lng:-77.0450}
-                    ]
-                },
-                {
-                    id: 4,
-                    nombre: "Alimentador 05 + Línea 1 Metro",
-                    tiempo: "35 - 45 min",
-                    distancia: "7.2 km",
-                    tipo: "🚏 Alimentador | 🟢 Línea 1",
-                    detalle: "Alimentador 05 hasta Estación San Juan → Línea 1 hasta destino",
-                    color: "#009E5F",
-                    puntos: [
-                        {lat:-12.0464, lng:-77.0428},
-                        {lat:-12.0600, lng:-77.0550},
-                        {lat:-12.0780, lng:-77.0480},
-                        {lat:-12.0900, lng:-77.0350}
-                    ]
-                },
-                {
-                    id: 5,
-                    nombre: "Corredor Rojo + Ruta 405",
-                    tiempo: "45 - 55 min",
-                    distancia: "9.1 km",
-                    tipo: "🔴 Corredor Rojo | 🚌 Ruta 405",
-                    detalle: "Corredor Rojo hasta Av. Brasil → Ruta 405 hasta destino",
-                    color: "#D32F2F",
-                    puntos: [
-                        {lat:-12.0464, lng:-77.0428},
-                        {lat:-12.0350, lng:-77.0300},
-                        {lat:-12.0520, lng:-77.0180},
-                        {lat:-12.0700, lng:-77.0050}
-                    ]
-                }
-            ];
-
-            llenarMenuRutas();
-            mostrarMensaje(`✅ ${rutasDisponibles.length} rutas disponibles (datos oficiales Lima)`, "info");
-            // Dibuja primera ruta automáticamente
-            mostrarRutaSeleccionada();
-        }
-
-        // 📋 LLENAR MENÚ DESPLEGABLE
-        function llenarMenuRutas() {
-            const select = document.getElementById("listaRutas");
-            select.innerHTML = "";
-
-            rutasDisponibles.forEach((ruta, i) => {
-                const opcion = document.createElement("option");
-                opcion.value = i;
-                opcion.textContent = `Ruta ${i+1} → ${ruta.tiempo} | ${ruta.nombre}`;
-                select.appendChild(opcion);
+            directionsService.route({
+                origin: origen,
+                destination: destino,
+                travelMode: google.maps.TravelMode.TRANSIT,
+                provideRouteAlternatives: true,
+                transitOptions: { departureTime: new Date() }
+            })
+            .then(respuesta => {
+                directionsRenderer.setDirections(respuesta);
+                mostrarRutasEnLista(respuesta.routes);
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById("rutas").innerHTML = "<p style='padding:12px'>No se encontraron rutas de transporte público</p>";
             });
-
-            document.getElementById("selectorRutas").style.display = "flex";
         }
 
-        // 🗺️ DIBUJAR RUTA PERFECTA, TRAZO VISIBLE Y CORRECTO
-        function mostrarRutaSeleccionada() {
-            const indice = parseInt(document.getElementById("listaRutas").value) || 0;
-            const ruta = rutasDisponibles[indice];
+        function mostrarRutasEnLista(rutas) {
+            const contenedor = document.getElementById("rutas");
+            contenedor.innerHTML = "";
 
-            // Limpiar trazo anterior
-            if (trazoRuta) trazoRuta.setMap(null);
+            rutas.forEach((ruta, idx) => {
+                const duracion = ruta.legs[0].duration.text;
+                const distancia = ruta.legs[0].distance.text;
+                let medios = [];
 
-            // ✅ TRAZO GRUESO, COLOR OFICIAL, MUY VISIBLE
-            trazoRuta = new google.maps.Polyline({
-                path: ruta.puntos,
-                geodesic: true,
-                strokeColor: ruta.color,
-                strokeOpacity: 0.95,
-                strokeWeight: 7,
-                map: map
+                ruta.legs[0].steps.forEach(paso => {
+                    if (paso.travelMode === "TRANSIT") {
+                        const linea = paso.transit.line.shortName || paso.transit.line.name;
+                        const tipo = paso.transit.line.vehicle.name;
+                        medios.push(`${tipo}: ${linea}`);
+                    }
+                });
+
+                const div = document.createElement("div");
+                div.className = "ruta-item";
+                div.innerHTML = `
+                    <div class="ruta-titulo">Opción ${idx+1} • ${duracion} • ${distancia}</div>
+                    <div class="ruta-detalle">${medios.join(" → ") || "A pie + transporte"}</div>
+                `;
+                div.addEventListener("click", () => directionsRenderer.setRouteIndex(idx));
+                contenedor.appendChild(div);
             });
-
-            // Centrar mapa exactamente en la ruta
-            const limites = new google.maps.LatLngBounds();
-            ruta.puntos.forEach(p => limites.extend(p));
-            map.fitBounds(limites);
-
-            // ✅ MOSTRAR DETALLES COMPLETOS
-            document.getElementById("mensaje").innerHTML = `
-                <div class="info">
-                    <strong>${ruta.nombre}</strong><br>
-                    ⏱️ Tiempo: ${ruta.tiempo} &nbsp; 📏 Distancia: ${ruta.distancia}<br>
-                    🚏 Transporte: ${ruta.tipo}<br>
-                    <div class="detalle-ruta">📌 Recorrido: ${ruta.detalle}</div>
-                </div>
-            `;
-        }
-
-        function mostrarMensaje(texto, tipo) {
-            document.getElementById("mensaje").innerHTML = `<div class="${tipo}">${texto}</div>`;
         }
     </script>
 
-    <!-- ✅ TU CLAVE AQUÍ (solo para mapa, NO necesitas facturación) -->
-    <script async defer
-        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places,geocoding&callback=initMap&language=es&region=PE">
-    </script>
+    <!-- Carga API Google Maps -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places&callback=initMap" async defer></script>
 </body>
 </html>
