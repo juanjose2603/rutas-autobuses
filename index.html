@@ -176,25 +176,28 @@
         let lineaRecorrido = null, puntosRecorrido = [];
         let respuestaCompleta = null;
         let elementosRuta = [];
-        let etiquetasRuta = []; // Para guardar los números visibles en el mapa
+        let etiquetasRuta = [];
 
         const COLORES = ["#1a73e8", "#34a853", "#fbbc05", "#ea4335"];
         const COLOR_PIE = "#909090";
+        // ✅ Tramo a pie en línea PUNTEADA
         const ESTILO_PIE = {
-            strokeOpacity: 0.7,
+            strokeOpacity: 0.8,
             strokeWeight: 3,
             icons: [{
                 icon: { path: google.maps.SymbolPath.FORWARD_OPEN_ARROW, scale: 2 },
                 offset: '100%',
                 repeat: '50px'
-            }]
+            }],
+            // Definición de trazo punteado
+            strokeDashArray: [4, 4]
         };
 
         function iniciarMapa() {
             mapa = new google.maps.Map(document.getElementById("map"), {
                 center: { lat: 19.4326, lng: -99.1332 },
                 zoom: 12,
-                gestureHandling: "greedy" // Mejor desplazamiento en móviles
+                gestureHandling: "greedy"
             });
             servicioDirecciones = new google.maps.DirectionsService();
             new google.maps.places.Autocomplete(document.getElementById("origen"));
@@ -332,24 +335,26 @@
                     geodesic: true,
                     strokeColor: paso.travel_mode === "TRANSIT" ? colorRuta : COLOR_PIE,
                     strokeWeight: paso.travel_mode === "TRANSIT" ? 7 : 3,
-                    strokeOpacity: paso.travel_mode === "TRANSIT" ? 0.95 : 0.7,
-                    icons: paso.travel_mode === "WALKING" ? ESTILO_PIE.icons : []
+                    strokeOpacity: paso.travel_mode === "TRANSIT" ? 0.95 : ESTILO_PIE.strokeOpacity,
+                    icons: paso.travel_mode === "WALKING" ? ESTILO_PIE.icons : [],
+                    // ✅ Aplicar punteado solo al tramo a pie
+                    strokeDashArray: paso.travel_mode === "WALKING" ? ESTILO_PIE.strokeDashArray : []
                 });
                 trazo.setMap(mapa);
                 elementosRuta.push(trazo);
 
-                // ✅ MOSTRAR NÚMERO DE RUTA SOBRE EL MAPA
+                // ✅ MOSTRAR NÚMERO DE RUTA AL INICIO / PARADERO DE SALIDA
                 if (paso.travel_mode === "TRANSIT" && paso.transit) {
                     const linea = paso.transit.line;
                     if (!linea) return;
                     const numeroRuta = linea.short_name || linea.name || "";
                     if (!numeroRuta) return;
 
-                    // Posición central para colocar el número
-                    const puntoMedio = paso.path[Math.floor(paso.path.length / 2)];
+                    // Tomamos el PRIMER punto del recorrido = inicio / paradero
+                    const puntoInicio = paso.path[0];
 
                     const etiqueta = new google.maps.InfoWindow({
-                        position: puntoMedio,
+                        position: puntoInicio,
                         content: `<div style="background:${colorRuta}; color:white; padding:2px 6px; border-radius:12px; font-size:12px; font-weight:bold; text-align:center; min-width:24px; box-shadow:0 1px 3px rgba(0,0,0,0.3);">${numeroRuta}</div>`,
                         disableAutoPan: true
                     });
