@@ -3,34 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rutas Transporte Público</title>
+    <title>Rutas Transporte - Lista debajo del mapa</title>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
         body { display: flex; flex-direction: column; height: 100vh; }
-        .panel { padding: 12px; background: #f8f9fa; border-bottom: 1px solid #ddd; }
+
+        /* Panel superior */
+        .panel-superior { padding: 12px; background: #f8f9fa; border-bottom: 1px solid #ddd; }
         .campo { margin: 8px 0; width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; }
         button { padding: 10px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin: 6px 6px 6px 0; font-size: 14px; }
-        select { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; background: white; }
         .btn-azul { background: #1a73e8; color: white; }
         .btn-verde { background: #34a853; color: white; }
         .btn-rojo { background: #ea4335; color: white; }
         .btn-gris { background: #70757a; color: white; }
         button:hover { opacity: 0.9; }
-        #map { flex: 1; width: 100%; }
-        #info-ruta { margin-top: 12px; padding: 10px; background: white; border-radius: 4px; border: 1px solid #eee; font-size: 14px; max-height: 300px; overflow-y: auto; }
-        #compartir-info { margin-top: 10px; padding: 8px; background: #e8f0fe; border-radius: 4px; display: none; font-size: 13px; }
-        .linea { margin: 8px 0 8px 12px; }
-        .ruta1 { color: #1a73e8; font-weight: bold; }
-        .ruta2 { color: #34a853; font-weight: bold; }
-        .ruta3 { color: #fbbc05; font-weight: bold; }
-        .ruta4 { color: #ea4335; font-weight: bold; }
+
+        /* Mapa */
+        #map { width: 100%; height: 55vh; border-bottom: 1px solid #ddd; }
+
+        /* Sección de rutas debajo del mapa */
+        .seccion-rutas { padding: 12px; background: #ffffff; overflow-y: auto; max-height: 40vh; }
+        .titulo-seccion { font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #333; }
+        .ruta-item {
+            border: 1px solid #eee;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .ruta-item:hover {
+            background-color: #f8f9fa;
+            border-color: #ddd;
+        }
+        .ruta-item.activa {
+            background-color: #e8f0fe;
+            border-color: #1a73e8;
+        }
+        .ruta-titulo { font-weight: bold; margin-bottom: 5px; }
+        .detalles-ruta { font-size: 14px; color: #555; margin-left: 10px; }
+        .linea { margin: 6px 0; }
         .a-pie { color: #70757a; font-style: italic; }
-        .horario { font-size: 13px; color: #555; margin-left: 15px; }
+        .horario { font-size: 13px; color: #666; margin-left: 15px; }
+
+        /* Compartir ubicación */
+        #compartir-info { margin-top: 10px; padding: 8px; background: #e8f0fe; border-radius: 4px; display: none; font-size: 13px; }
+
+        /* Colores por ruta */
+        .ruta1 { color: #1a73e8; }
+        .ruta2 { color: #34a853; }
+        .ruta3 { color: #fbbc05; }
+        .ruta4 { color: #ea4335; }
     </style>
 </head>
 <body>
-    <div class="panel">
+    <!-- Panel superior -->
+    <div class="panel-superior">
         <input type="text" id="origen" class="campo" placeholder="Origen — se detecta automáticamente">
         <input type="text" id="destino" class="campo" placeholder="Dirección de llegada">
 
@@ -40,29 +69,39 @@
         <button class="btn-gris" onclick="limpiarRecorrido()">🧹 Limpiar recorrido</button>
         <button class="btn-rojo" onclick="detenerSeguimiento()" id="btnDetener" style="display:none;">⏹️ Detener seguimiento</button>
 
-        <select id="selectorRutas" style="display: none;" onchange="mostrarRutaSeleccionada()">
-            <option value="">Selecciona una ruta</option>
-        </select>
-
         <div id="compartir-info">
             <p>✅ Seguimiento activo. Actualización cada 3 segundos.</p>
             <p>Enlace: <a id="enlaceUbicacion" href="#" target="_blank">Cargando...</a></p>
             <button onclick="copiarEnlace()">📋 Copiar enlace</button>
         </div>
-
-        <div id="info-ruta"></div>
     </div>
 
+    <!-- Mapa -->
     <div id="map"></div>
+
+    <!-- Lista de rutas debajo del mapa -->
+    <div class="seccion-rutas">
+        <div class="titulo-seccion">Rutas disponibles:</div>
+        <div id="lista-rutas">Escribe origen y destino, luego pulsa "Buscar rutas"</div>
+    </div>
 
     <script>
         let mapa, servicioDirecciones, marcadorUbicacion, watchId = null;
         let lineaRecorrido = null, puntosRecorrido = [];
         let respuestaCompleta = null;
         let elementosRuta = [];
+
         const COLORES = ["#1a73e8", "#34a853", "#fbbc05", "#ea4335"];
         const COLOR_PIE = "#909090";
-        const ESTILO_PIE = { strokeOpacity: 0.7, strokeWeight: 3, icons: [{ icon: { path: google.maps.SymbolPath.FORWARD_OPEN_ARROW, scale: 2 }, offset: '100%', repeat: '50px' }] };
+        const ESTILO_PIE = {
+            strokeOpacity: 0.7,
+            strokeWeight: 3,
+            icons: [{
+                icon: { path: google.maps.SymbolPath.FORWARD_OPEN_ARROW, scale: 2 },
+                offset: '100%',
+                repeat: '50px'
+            }]
+        };
 
         function iniciarMapa() {
             mapa = new google.maps.Map(document.getElementById("map"), {
@@ -77,14 +116,26 @@
 
         function usarMiUbicacion() {
             if (!navigator.geolocation) return alert("Geolocalización no soportada");
-            navigator.geolocation.getCurrentPosition(pos => {
-                const ubicacion = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                mapa.setCenter(ubicacion);
-                if (!marcadorUbicacion) {
-                    marcadorUbicacion = new google.maps.Marker({ position: ubicacion, map: mapa, title: "Mi ubicación", icon: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png" });
-                } else marcadorUbicacion.setPosition(ubicacion);
-                new google.maps.Geocoder().geocode({ location: ubicacion }, res => { if (res[0]) document.getElementById("origen").value = res[0].formatted_address; });
-            }, () => alert("No se pudo obtener ubicación"));
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    const ubicacion = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                    mapa.setCenter(ubicacion);
+                    if (!marcadorUbicacion) {
+                        marcadorUbicacion = new google.maps.Marker({
+                            position: ubicacion,
+                            map: mapa,
+                            title: "Mi ubicación",
+                            icon: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png"
+                        });
+                    } else {
+                        marcadorUbicacion.setPosition(ubicacion);
+                    }
+                    new google.maps.Geocoder().geocode({ location: ubicacion }, (res) => {
+                        if (res[0]) document.getElementById("origen").value = res[0].formatted_address;
+                    });
+                },
+                () => alert("No se pudo obtener ubicación")
+            );
         }
 
         function calcularRuta() {
@@ -94,12 +145,8 @@
 
             limpiarRutaAnterior();
             respuestaCompleta = null;
-            document.getElementById("info-ruta").innerHTML = "";
-            const selector = document.getElementById("selectorRutas");
-            selector.innerHTML = '<option value="">Cargando...</option>';
-            selector.style.display = "block";
+            document.getElementById("lista-rutas").innerHTML = "🔄 Buscando rutas...";
 
-            // ✅ Forzamos idioma español y unidades métricas
             const solicitud = {
                 origin: origen,
                 destination: destino,
@@ -113,42 +160,97 @@
 
             servicioDirecciones.route(solicitud, (respuesta, estado) => {
                 if (estado !== "OK") {
-                    selector.innerHTML = '<option value="">Sin rutas</option>';
-                    document.getElementById("info-ruta").innerHTML = "❌ No hay rutas disponibles";
+                    document.getElementById("lista-rutas").innerHTML = "❌ No se encontraron rutas para este trayecto";
                     return;
                 }
+
                 respuestaCompleta = respuesta;
-                selector.innerHTML = '<option value="">Elige una ruta</option>';
-                respuestaCompleta.routes.forEach((ruta, i) => {
-                    const tramo = ruta.legs[0];
-                    const dur = tramo.duration?.text || "Sin tiempo";
-                    const dist = tramo.distance?.text || "Sin distancia";
-                    const op = document.createElement("option");
-                    op.value = i;
-                    op.textContent = `Ruta ${i+1} — ${dur} | ${dist}`;
-                    selector.appendChild(op);
-                });
+                mostrarListaRutas();
             });
         }
 
         function limpiarRutaAnterior() {
-            elementosRuta.forEach(el => el.setMap(null));
+            elementosRuta.forEach(elemento => {
+                if (elemento && elemento.setMap) elemento.setMap(null);
+            });
             elementosRuta = [];
         }
 
-        function mostrarRutaSeleccionada() {
-            const indice = parseInt(document.getElementById("selectorRutas").value);
-            if (isNaN(indice) || !respuestaCompleta) return;
+        // 🆕 Función para mostrar todas las rutas en lista debajo del mapa
+        function mostrarListaRutas() {
+            const contenedor = document.getElementById("lista-rutas");
+            contenedor.innerHTML = "";
+
+            respuestaCompleta.routes.forEach((ruta, indice) => {
+                const tramo = ruta.legs[0];
+                const duracion = tramo.duration?.text || "Sin tiempo";
+                const distancia = tramo.distance?.text || "Sin distancia";
+                const claseColor = `ruta${indice + 1}`;
+
+                // Crear elemento de ruta
+                const divRuta = document.createElement("div");
+                divRuta.className = "ruta-item";
+                divRuta.id = `ruta-${indice}`;
+                divRuta.onclick = () => seleccionarRuta(indice);
+
+                // Contenido básico
+                let contenido = `<div class="ruta-titulo ${claseColor}">🚏 Ruta ${indice + 1} | ${duracion} | ${distancia}</div>`;
+
+                // Detalles de la ruta
+                contenido += `<div class="detalles-ruta">`;
+                tramo.steps.forEach(paso => {
+                    if (!paso) return;
+                    if (paso.travel_mode === "TRANSIT" && paso.transit) {
+                        const linea = paso.transit.line;
+                        if (!linea) return;
+                        const numeroRuta = linea.short_name || linea.name || "Sin número";
+                        const tipo = linea.vehicle?.type || "";
+                        let tipoTexto = "";
+
+                        if (tipo === "BUS") {
+                            tipoTexto = numeroRuta.startsWith("R") ? "Corredor" :
+                                        numeroRuta.startsWith("A") ? "Alimentador" : "Autobús";
+                        } else if (tipo === "SUBWAY") tipoTexto = "Metro";
+                        else if (tipo === "TRAIN" || tipo === "RAIL") tipoTexto = "Metropolitano / Tren";
+
+                        contenido += `<div class="linea">✅ ${tipoTexto}: <strong>${numeroRuta}</strong></div>`;
+                        contenido += `<div class="horario">⏱️ Salida: ${paso.transit.departure_time?.text || "?"} → Llegada: ${paso.transit.arrival_time?.text || "?"}</div>`;
+                    } else if (paso.travel_mode === "WALKING") {
+                        contenido += `<div class="linea a-pie">🚶 A pie: ${paso.distance?.text || "?"} | ${paso.duration?.text || "?"}</div>`;
+                    }
+                });
+                contenido += `</div>`;
+
+                divRuta.innerHTML = contenido;
+                contenedor.appendChild(divRuta);
+            });
+
+            // Seleccionar automáticamente la primera ruta al cargar
+            if (respuestaCompleta.routes.length > 0) {
+                seleccionarRuta(0);
+            }
+        }
+
+        // Seleccionar ruta y mostrarla en el mapa
+        function seleccionarRuta(indice) {
+            if (isNaN(indice) || !respuestaCompleta || !respuestaCompleta.routes[indice]) return;
+
             limpiarRutaAnterior();
+            // Quitar selección anterior
+            document.querySelectorAll(".ruta-item").forEach(el => el.classList.remove("activa"));
+            // Marcar como activa
+            document.getElementById(`ruta-${indice}`).classList.add("activa");
+
             const ruta = respuestaCompleta.routes[indice];
             const tramo = ruta.legs[0];
-            const colorRuta = COLORES[indice] || "#666";
+            const colorRuta = COLORES[indice] || "#666666";
 
-            // ✅ Dibujar cada tramo (transporte + a pie)
+            // Dibujar todos los tramos
             tramo.steps.forEach(paso => {
-                if (!paso.path) return;
+                if (!paso || !paso.path) return;
                 const trazo = new google.maps.Polyline({
                     path: paso.path,
+                    geodesic: true,
                     strokeColor: paso.travel_mode === "TRANSIT" ? colorRuta : COLOR_PIE,
                     strokeWeight: paso.travel_mode === "TRANSIT" ? 6 : 3,
                     strokeOpacity: paso.travel_mode === "TRANSIT" ? 0.9 : 0.7,
@@ -157,68 +259,63 @@
                 trazo.setMap(mapa);
                 elementosRuta.push(trazo);
             });
+
             mapa.fitBounds(tramo.bounds);
-            mostrarDetallesRuta(indice);
         }
 
-        // ✅ Mostrar TODO: número línea, distancias, tiempos, horarios
-        function mostrarDetallesRuta(indice) {
-            const ruta = respuestaCompleta.routes[indice];
-            const tramo = ruta.legs[0];
-            const contenedor = document.getElementById("info-ruta");
-            const clase = `ruta${indice+1}`;
-
-            let html = `<p class="${clase}">🚏 Ruta ${indice+1} | Total: ${tramo.duration?.text || "?"} | ${tramo.distance?.text || "?"}</p><hr>`;
-
-            tramo.steps.forEach(paso => {
-                if (paso.travel_mode === "TRANSIT" && paso.transit) {
-                    const linea = paso.transit.line;
-                    const tipo = linea.vehicle.type;
-                    const numRuta = linea.short_name || linea.name || "Sin número";
-                    let tipoTexto = "";
-
-                    if (tipo === "BUS") {
-                        tipoTexto = linea.short_name?.startsWith("R") ? "Corredor" :
-                                    linea.short_name?.startsWith("A") ? "Alimentador" : "Autobús";
-                    } else if (tipo === "SUBWAY") tipoTexto = "Metro";
-                    else if (tipo === "TRAIN" || tipo === "RAIL") tipoTexto = "Metropolitano / Tren";
-
-                    html += `<p class="linea ${clase}">✅ ${tipoTexto}: <strong>${numRuta}</strong></p>`;
-                    html += `<p class="horario">⏱️ Salida: ${paso.transit.departure_time?.text || "?"} | Llegada: ${paso.transit.arrival_time?.text || "?"}</p>`;
-                    html += `<p class="horario">📍 De: ${paso.transit.departure_stop.name} → ${paso.transit.arrival_stop.name}</p>`;
-                } else if (paso.travel_mode === "WALKING") {
-                    html += `<p class="linea a-pie">🚶 A pie: ${paso.distance?.text || "?"} | ${paso.duration?.text || "?"}</p>`;
-                }
-            });
-
-            contenedor.innerHTML = html;
-        }
-
-        // Seguimiento ubicación
+        // Funciones de seguimiento de ubicación
         function iniciarSeguimiento() {
-            if (!navigator.geolocation) return alert("No soportado");
+            if (!navigator.geolocation) return alert("Tu navegador no admite geolocalización");
             if (watchId) detenerSeguimiento();
+
             document.getElementById("compartir-info").style.display = "block";
             document.getElementById("btnDetener").style.display = "inline-block";
             limpiarRecorrido();
-            lineaRecorrido = new google.maps.Polyline({ path: puntosRecorrido, strokeColor: "#2196F3", strokeOpacity: 0.9, strokeWeight: 5 });
+
+            lineaRecorrido = new google.maps.Polyline({
+                path: puntosRecorrido,
+                strokeColor: "#2196F3",
+                strokeOpacity: 0.9,
+                strokeWeight: 5
+            });
             lineaRecorrido.setMap(mapa);
-            watchId = navigator.geolocation.watchPosition(pos => {
-                const lat = pos.coords.latitude.toFixed(6);
-                const lng = pos.coords.longitude.toFixed(6);
-                const ubicacion = { lat: parseFloat(lat), lng: parseFloat(lng) };
-                puntosRecorrido.push(ubicacion);
-                lineaRecorrido.setPath(puntosRecorrido);
-                if (marcadorUbicacion) marcadorUbicacion.setPosition(ubicacion);
-                mapa.setCenter(ubicacion);
-                document.getElementById("enlaceUbicacion").href = `https://www.google.com/maps?q=${lat},${lng}`;
-                document.getElementById("enlaceUbicacion").textContent = `${lat}, ${lng}`;
-            }, err => alert("Error: " + err.message), { enableHighAccuracy: true, maximumAge: 2000, timeout: 5000 });
+
+            watchId = navigator.geolocation.watchPosition(
+                (pos) => {
+                    const lat = pos.coords.latitude.toFixed(6);
+                    const lng = pos.coords.longitude.toFixed(6);
+                    const ubicacion = { lat: parseFloat(lat), lng: parseFloat(lng) };
+
+                    puntosRecorrido.push(ubicacion);
+                    lineaRecorrido.setPath(puntosRecorrido);
+                    if (marcadorUbicacion) marcadorUbicacion.setPosition(ubicacion);
+                    mapa.setCenter(ubicacion);
+
+                    document.getElementById("enlaceUbicacion").href = `https://www.google.com/maps?q=${lat},${lng}`;
+                    document.getElementById("enlaceUbicacion").textContent = `${lat}, ${lng}`;
+                },
+                (err) => alert("Error al obtener ubicación: " + err.message),
+                { enableHighAccuracy: true, maximumAge: 2000, timeout: 5000 }
+            );
         }
 
-        function detenerSeguimiento() { if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; } document.getElementById("compartir-info").style.display = "none"; document.getElementById("btnDetener").style.display = "none"; }
-        function limpiarRecorrido() { puntosRecorrido = []; if (lineaRecorrido) lineaRecorrido.setPath([]); }
-        function copiarEnlace() { navigator.clipboard.writeText(document.getElementById("enlaceUbicacion").href).then(() => alert("Copiado ✅")); }
+        function detenerSeguimiento() {
+            if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+            document.getElementById("compartir-info").style.display = "none";
+            document.getElementById("btnDetener").style.display = "none";
+        }
+
+        function limpiarRecorrido() {
+            puntosRecorrido = [];
+            if (lineaRecorrido) lineaRecorrido.setPath([]);
+        }
+
+        function copiarEnlace() {
+            const enlace = document.getElementById("enlaceUbicacion").href;
+            navigator.clipboard.writeText(enlace)
+                .then(() => alert("Enlace copiado ✅"))
+                .catch(() => alert("No se pudo copiar el enlace"));
+        }
 
         window.onload = iniciarMapa;
     </script>
