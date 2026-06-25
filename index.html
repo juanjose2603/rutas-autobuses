@@ -3,23 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rutas Transporte - Etiquetas Fijas en Inicio</title>
+    <title>Rutas Transporte - Marcadores Completos</title>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
         html, body { height: 100%; overflow: hidden; display: flex; flex-direction: column; }
 
-        /* --------------------------
-        PANEL SUPERIOR
-        -------------------------- */
+        /* -------------------------- PANEL SUPERIOR -------------------------- */
         .panel-superior {
             padding: 8px 10px;
             background: #f8f9fa;
             border-bottom: 1px solid #ddd;
             flex-shrink: 0;
         }
-
-        /* Campos en líneas separadas */
         .campo {
             width: 100%;
             padding: 9px 10px;
@@ -28,9 +24,6 @@
             border-radius: 4px;
             font-size: 15px;
         }
-        .campo::placeholder { font-size: 14px; color: #888; }
-
-        /* Botones */
         .fila-botones {
             display: flex;
             flex-wrap: wrap;
@@ -49,28 +42,10 @@
         }
         .btn-azul { background: #1a73e8; color: white; }
         .btn-verde { background: #34a853; color: white; }
-        .btn-rojo { background: #ea4335; color: white; }
         .btn-gris { background: #70757a; color: white; }
-        button:hover { opacity: 0.9; }
+        .btn-rojo { background: #ea4335; color: white; }
 
-        /* Info seguimiento */
-        #compartir-info {
-            padding: 6px 10px;
-            background: #e8f0fe;
-            border-radius: 4px;
-            display: none;
-            font-size: 12px;
-            margin-top: 6px;
-        }
-        #compartir-info button {
-            padding: 4px 8px;
-            font-size: 11px;
-            flex: none;
-        }
-
-        /* --------------------------
-        MAPA
-        -------------------------- */
+        /* -------------------------- MAPA -------------------------- */
         #map {
             width: 100%;
             height: 45vh;
@@ -78,44 +53,67 @@
             flex-shrink: 0;
         }
 
-        /* ✅ Etiqueta fija para número de ruta */
+        /* Etiquetas pequeñas */
+        .etiqueta-texto {
+            background: #fff;
+            border: 1px solid #444;
+            border-radius: 3px;
+            padding: 1px 4px;
+            font-size: 9px;
+            color: #222;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+            transform: translate(-50%, -100%);
+            position: absolute;
+            white-space: nowrap;
+            z-index: 999;
+            pointer-events: none;
+        }
         .etiqueta-ruta {
-            background: #ffffff;
+            background: #fff;
             border: 2px solid;
             border-radius: 50%;
-            width: 32px;
-            height: 32px;
-            line-height: 28px;
+            width: 30px;
+            height: 30px;
+            line-height: 26px;
             text-align: center;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: bold;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            transform: translate(-50%, -50%);
+            position: absolute;
+            z-index: 1000;
+            pointer-events: none;
+        }
+        .etiqueta-bajada {
+            background: #fff;
+            border: 2px solid #222;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            line-height: 20px;
+            text-align: center;
+            font-size: 11px;
+            font-weight: bold;
+            color: #222;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
             transform: translate(-50%, -50%);
             position: absolute;
             z-index: 1000;
             pointer-events: none;
         }
 
-        /* Colores distintivos por ruta */
+        /* Colores por ruta */
         .color-ruta-1 { border-color: #1a73e8; color: #1a73e8; }
         .color-ruta-2 { border-color: #34a853; color: #34a853; }
         .color-ruta-3 { border-color: #fbbc05; color: #fbbc05; }
         .color-ruta-4 { border-color: #ea4335; color: #ea4335; }
 
-        /* --------------------------
-        LISTA DE RUTAS
-        -------------------------- */
+        /* -------------------------- LISTA RUTAS -------------------------- */
         .seccion-rutas {
             padding: 10px;
-            background: #ffffff;
+            background: #fff;
             overflow-y: auto;
             flex: 1;
-        }
-        .titulo-seccion {
-            font-size: 16px;
-            font-weight: bold;
-            margin-bottom: 10px;
-            color: #333;
         }
         .ruta-item {
             border: 1px solid #eee;
@@ -123,115 +121,64 @@
             padding: 12px;
             margin-bottom: 12px;
             cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .ruta-item:hover {
-            background-color: #f8f9fa;
-            border-color: #ccc;
         }
         .ruta-item.activa {
-            background-color: #e8f0fe;
+            background: #e8f0fe;
             border-color: #1a73e8;
         }
-        .ruta-titulo {
-            font-weight: bold;
-            margin-bottom: 8px;
-            font-size: 15px;
-        }
-        .detalles-ruta {
-            font-size: 14px;
-            color: #555;
-            margin-left: 8px;
-        }
-        .linea { margin: 6px 0; }
-        .a-pie { color: #70757a; font-style: italic; }
-        .horario { font-size: 13px; color: #666; margin-left: 12px; }
 
-        /* --------------------------
-        AJUSTES MÓVIL
-        -------------------------- */
+        /* -------------------------- MÓVIL -------------------------- */
         @media (max-width: 480px) {
             #map { height: 40vh; }
-            .campo { font-size: 16px; padding: 10px; }
-            button { font-size: 14px; padding: 9px; }
-            .ruta-titulo { font-size: 16px; }
-            .detalles-ruta { font-size: 15px; }
-            .titulo-seccion { font-size: 17px; }
-            .etiqueta-ruta { width: 28px; height: 28px; font-size: 12px; line-height: 26px; }
+            .etiqueta-texto { font-size: 8px; padding: 1px 3px; }
+            .etiqueta-ruta { width: 26px; height: 26px; font-size: 11px; line-height: 22px; }
+            .etiqueta-bajada { width: 22px; height: 22px; font-size: 10px; line-height: 18px; }
         }
     </style>
 </head>
 <body>
-    <!-- Panel superior -->
     <div class="panel-superior">
         <input type="text" id="origen" class="campo" placeholder="📍 Dirección de origen">
         <input type="text" id="destino" class="campo" placeholder="🏁 Dirección de destino">
-
         <div class="fila-botones">
             <button class="btn-azul" onclick="usarMiUbicacion()">📍 Mi ubicación</button>
             <button class="btn-azul" onclick="calcularRuta()">🚌 Buscar rutas</button>
-            <button class="btn-verde" onclick="iniciarSeguimiento()">🔁 Seguimiento</button>
-            <button class="btn-gris" onclick="limpiarRecorrido()">🧹 Limpiar</button>
-            <button class="btn-rojo" onclick="detenerSeguimiento()" id="btnDetener" style="display:none;">⏹️ Detener</button>
-        </div>
-
-        <div id="compartir-info">
-            <p>✅ Seguimiento activo | <a id="enlaceUbicacion" href="#" target="_blank">Ver en mapa</a> <button onclick="copiarEnlace()">Copiar</button></p>
+            <button class="btn-gris" onclick="limpiarTodo()">🧹 Limpiar</button>
         </div>
     </div>
-
-    <!-- Mapa -->
     <div id="map"></div>
-
-    <!-- Lista de rutas -->
     <div class="seccion-rutas">
         <div class="titulo-seccion">Rutas disponibles:</div>
-        <div id="lista-rutas">Escribe origen y destino, luego pulsa "Buscar rutas"</div>
+        <div id="lista-rutas">Escribe origen y destino y pulsa "Buscar"</div>
     </div>
 
     <script>
-        let mapa, servicioDirecciones, marcadorUbicacion, watchId = null;
-        let lineaRecorrido = null, puntosRecorrido = [];
-        let respuestaCompleta = null;
-        let elementosRuta = [];
-        let etiquetasRuta = [];
-
-        // Colores fijos por ruta
+        let mapa, servicioDirecciones, respuestaCompleta;
+        let elementos = [];
         const COLORES = ["#1a73e8", "#34a853", "#fbbc05", "#ea4335"];
-        const COLOR_PIE = "#909090";
-        // ✅ Tramo a pie solo con línea punteada, sin flechas
-        const ESTILO_PIE = {
-            strokeOpacity: 0.8,
-            strokeWeight: 3,
-            strokeDashArray: [5, 5]
-        };
+        const COLOR_PIE = "#ea4335"; // Ruta a pie en ROJO
+        const ESTILO_PIE = { strokeOpacity: 0.8, strokeWeight: 3, strokeDashArray: [5, 5] };
 
-        // ✅ Clase para etiquetas FIJAS y permanentes en el mapa
-        class EtiquetaRuta extends google.maps.OverlayView {
-            constructor(posicion, numero, claseColor) {
+        // Clase para etiquetas fijas
+        class Etiqueta extends google.maps.OverlayView {
+            constructor(pos, contenido, clase) {
                 super();
-                this.posicion = posicion;
-                this.numero = numero;
-                this.claseColor = claseColor;
+                this.pos = pos;
+                this.contenido = contenido;
+                this.clase = clase;
             }
-
             onAdd() {
                 this.div = document.createElement("div");
-                this.div.className = `etiqueta-ruta ${this.claseColor}`;
-                this.div.textContent = this.numero;
-                const panes = this.getPanes();
-                panes.overlayMouseTarget.appendChild(this.div);
+                this.div.className = this.clase;
+                this.div.innerHTML = this.contenido;
+                this.getPanes().overlayMouseTarget.appendChild(this.div);
             }
-
             draw() {
-                const posicionPixel = this.getProjection().fromLatLngToDivPixel(this.posicion);
-                this.div.style.left = `${posicionPixel.x}px`;
-                this.div.style.top = `${posicionPixel.y}px`;
+                const p = this.getProjection().fromLatLngToDivPixel(this.pos);
+                this.div.style.left = `${p.x}px`;
+                this.div.style.top = `${p.y}px`;
             }
-
-            onRemove() {
-                if (this.div) this.div.remove();
-            }
+            onRemove() { if (this.div) this.div.remove(); }
         }
 
         function iniciarMapa() {
@@ -243,215 +190,102 @@
             servicioDirecciones = new google.maps.DirectionsService();
             new google.maps.places.Autocomplete(document.getElementById("origen"));
             new google.maps.places.Autocomplete(document.getElementById("destino"));
-            usarMiUbicacion();
         }
 
         function usarMiUbicacion() {
-            if (!navigator.geolocation) return alert("Geolocalización no soportada");
-            navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                    const ubicacion = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                    mapa.setCenter(ubicacion);
-                    if (!marcadorUbicacion) {
-                        marcadorUbicacion = new google.maps.Marker({
-                            position: ubicacion,
-                            map: mapa,
-                            title: "Mi ubicación",
-                            icon: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png"
-                        });
-                    } else {
-                        marcadorUbicacion.setPosition(ubicacion);
-                    }
-                    new google.maps.Geocoder().geocode({ location: ubicacion }, (res) => {
-                        if (res[0]) document.getElementById("origen").value = res[0].formatted_address;
-                    });
-                },
-                () => alert("No se pudo obtener la ubicación"),
-                { enableHighAccuracy: true }
-            );
+            if (!navigator.geolocation) return alert("No soportado");
+            navigator.geolocation.getCurrentPosition(pos => {
+                const ubic = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                mapa.setCenter(ubic);
+                new google.maps.Geocoder().geocode({ location: ubic }, res => {
+                    if (res[0]) document.getElementById("origen").value = res[0].formatted_address;
+                });
+            });
+        }
+
+        function limpiarTodo() {
+            elementos.forEach(el => el.setMap(null));
+            elementos = [];
         }
 
         function calcularRuta() {
             const origen = document.getElementById("origen").value.trim();
             const destino = document.getElementById("destino").value.trim();
-            if (!origen || !destino) return alert("Completa origen y destino");
-
-            limpiarRutaAnterior();
-            respuestaCompleta = null;
-            document.getElementById("lista-rutas").innerHTML = "🔄 Buscando rutas...";
-
-            const solicitud = {
+            if (!origen || !destino) return alert("Completa ambos campos");
+            limpiarTodo();
+            document.getElementById("lista-rutas").innerHTML = "🔄 Buscando...";
+            servicioDirecciones.route({
                 origin: origen,
                 destination: destino,
                 travelMode: "TRANSIT",
-                transitOptions: { modes: ["BUS", "SUBWAY", "TRAIN"], routingPreference: "FEWER_TRANSFERS" },
                 provideRouteAlternatives: true,
                 language: "es",
-                region: "MX",
-                unitSystem: google.maps.UnitSystem.METRIC
-            };
-
-            servicioDirecciones.route(solicitud, (respuesta, estado) => {
+                region: "MX"
+            }, (res, estado) => {
                 if (estado !== "OK") {
-                    document.getElementById("lista-rutas").innerHTML = "❌ No se encontraron rutas";
+                    document.getElementById("lista-rutas").innerHTML = "❌ No se encontró ruta";
                     return;
                 }
-                respuestaCompleta = respuesta;
-                mostrarListaRutas();
+                respuestaCompleta = res;
+                mostrarRutas();
             });
         }
 
-        function limpiarRutaAnterior() {
-            elementosRuta.forEach(el => el.setMap(null));
-            etiquetasRuta.forEach(el => el.setMap(null));
-            elementosRuta = [];
-            etiquetasRuta = [];
-        }
-
-        function mostrarListaRutas() {
+        function mostrarRutas() {
             const contenedor = document.getElementById("lista-rutas");
             contenedor.innerHTML = "";
-
-            respuestaCompleta.routes.forEach((ruta, indice) => {
+            respuestaCompleta.routes.forEach((ruta, i) => {
                 const tramo = ruta.legs[0];
-                const duracion = tramo.duration?.text || "Sin tiempo";
-                const distancia = tramo.distance?.text || "Sin distancia";
-
-                const divRuta = document.createElement("div");
-                divRuta.className = "ruta-item";
-                divRuta.id = `ruta-${indice}`;
-                divRuta.onclick = () => seleccionarRuta(indice);
-
-                let contenido = `<div class="ruta-titulo" style="color:${COLORES[indice] || "#666"}">🚏 Ruta ${indice + 1} | ${duracion} | ${distancia}</div>`;
-                contenido += `<div class="detalles-ruta">`;
-
-                tramo.steps.forEach(paso => {
-                    if (!paso) return;
-                    if (paso.travel_mode === "TRANSIT" && paso.transit) {
-                        const linea = paso.transit.line;
-                        if (!linea) return;
-                        const numeroRuta = linea.short_name || linea.name || "Sin número";
-                        const tipo = linea.vehicle?.type || "";
-                        let tipoTexto = "";
-
-                        if (tipo === "BUS") {
-                            tipoTexto = numeroRuta.startsWith("R") ? "Corredor" :
-                                        numeroRuta.startsWith("A") ? "Alimentador" : "Autobús";
-                        } else if (tipo === "SUBWAY") tipoTexto = "Metro";
-                        else if (tipo === "TRAIN" || tipo === "RAIL") tipoTexto = "Tren / Metropolitano";
-
-                        contenido += `<div class="linea">✅ ${tipoTexto}: <strong>${numeroRuta}</strong></div>`;
-                        contenido += `<div class="horario">⏱️ Salida: ${paso.transit.departure_time?.text || "?"} → Llegada: ${paso.transit.arrival_time?.text || "?"}</div>`;
-                    } else if (paso.travel_mode === "WALKING") {
-                        contenido += `<div class="linea a-pie">🚶 A pie: ${paso.distance?.text || "?"} | ${paso.duration?.text || "?"}</div>`;
-                    }
-                });
-
-                contenido += `</div>`;
-                divRuta.innerHTML = contenido;
-                contenedor.appendChild(divRuta);
+                const div = document.createElement("div");
+                div.className = "ruta-item";
+                div.onclick = () => dibujarRuta(i);
+                div.innerHTML = `<strong style="color:${COLORES[i]}">Ruta ${i+1}</strong> | ${tramo.duration.text} | ${tramo.distance.text}`;
+                contenedor.appendChild(div);
             });
-
-            if (respuestaCompleta.routes.length > 0) seleccionarRuta(0);
+            dibujarRuta(0);
         }
 
-        function seleccionarRuta(indice) {
-            if (isNaN(indice) || !respuestaCompleta || !respuestaCompleta.routes[indice]) return;
-
-            limpiarRutaAnterior();
+        function dibujarRuta(indice) {
+            limpiarTodo();
             document.querySelectorAll(".ruta-item").forEach(el => el.classList.remove("activa"));
-            document.getElementById(`ruta-${indice}`).classList.add("activa");
-
+            document.querySelectorAll(".ruta-item")[indice].classList.add("activa");
             const ruta = respuestaCompleta.routes[indice];
             const tramo = ruta.legs[0];
-            const colorActual = COLORES[indice] || "#666666";
-            const claseColor = `color-ruta-${indice + 1}`;
+            const colorRuta = COLORES[indice];
+
+            // 📍 Punto inicial: "Estoy aquí"
+            elementos.push(new Etiqueta(tramo.start_location, "Estoy aquí", "etiqueta-texto").setMap(mapa));
 
             tramo.steps.forEach(paso => {
                 if (!paso || !paso.path) return;
-
-                // Dibujar recorrido
-                const trazo = new google.maps.Polyline({
+                const esTransporte = paso.travel_mode === "TRANSIT";
+                const linea = new google.maps.Polyline({
                     path: paso.path,
-                    geodesic: true,
-                    strokeColor: paso.travel_mode === "TRANSIT" ? colorActual : COLOR_PIE,
-                    strokeWeight: paso.travel_mode === "TRANSIT" ? 7 : 3,
-                    strokeOpacity: paso.travel_mode === "TRANSIT" ? 0.95 : ESTILO_PIE.strokeOpacity,
-                    strokeDashArray: paso.travel_mode === "WALKING" ? ESTILO_PIE.strokeDashArray : []
+                    strokeColor: esTransporte ? colorRuta : COLOR_PIE,
+                    strokeWeight: esTransporte ? 7 : 3,
+                    strokeOpacity: 0.9,
+                    strokeDashArray: esTransporte ? [] : ESTILO_PIE.strokeDashArray
                 });
-                trazo.setMap(mapa);
-                elementosRuta.push(trazo);
+                linea.setMap(mapa);
+                elementos.push(linea);
 
-                // ✅ NÚMERO DE RUTA DE FORMA FIJA EN EL PUNTO DE INICIO
-                if (paso.travel_mode === "TRANSIT" && paso.transit) {
-                    const numeroRuta = paso.transit.line.short_name || paso.transit.line.name || "";
-                    if (!numeroRuta) return;
+                const inicio = paso.start_location;
+                const fin = paso.end_location;
 
-                    // Tomamos EXACTAMENTE el punto inicial del recorrido
-                    const puntoInicio = new google.maps.LatLng(
-                        paso.start_location.lat(),
-                        paso.start_location.lng()
-                    );
-
-                    const etiqueta = new EtiquetaRuta(puntoInicio, numeroRuta, claseColor);
-                    etiqueta.setMap(mapa);
-                    etiquetasRuta.push(etiqueta);
+                if (esTransporte && paso.transit) {
+                    const num = paso.transit.line.short_name || paso.transit.line.name;
+                    if (num) {
+                        // 🚌 Número de ruta al inicio
+                        elementos.push(new Etiqueta(inicio, num, `etiqueta-ruta color-ruta-${indice+1}`).setMap(mapa));
+                        // 🛑 Círculo B al final
+                        elementos.push(new Etiqueta(fin, "B", "etiqueta-bajada").setMap(mapa));
+                    }
                 }
             });
 
+            // 🏁 Destino final: "Llegada"
+            elementos.push(new Etiqueta(tramo.end_location, "Llegada", "etiqueta-texto").setMap(mapa));
             mapa.fitBounds(tramo.bounds);
-        }
-
-        function iniciarSeguimiento() {
-            if (!navigator.geolocation) return alert("No soportado");
-            if (watchId) detenerSeguimiento();
-
-            document.getElementById("compartir-info").style.display = "block";
-            document.getElementById("btnDetener").style.display = "inline-block";
-            limpiarRecorrido();
-
-            lineaRecorrido = new google.maps.Polyline({
-                path: puntosRecorrido,
-                strokeColor: "#2196F3",
-                strokeOpacity: 0.9,
-                strokeWeight: 5
-            });
-            lineaRecorrido.setMap(mapa);
-
-            watchId = navigator.geolocation.watchPosition(
-                (pos) => {
-                    const lat = pos.coords.latitude.toFixed(6);
-                    const lng = pos.coords.longitude.toFixed(6);
-                    const ubicacion = { lat: parseFloat(lat), lng: parseFloat(lng) };
-
-                    puntosRecorrido.push(ubicacion);
-                    lineaRecorrido.setPath(puntosRecorrido);
-                    if (marcadorUbicacion) marcadorUbicacion.setPosition(ubicacion);
-                    mapa.setCenter(ubicacion);
-
-                    document.getElementById("enlaceUbicacion").href = `https://www.google.com/maps?q=${lat},${lng}`;
-                    document.getElementById("enlaceUbicacion").textContent = `${lat}, ${lng}`;
-                },
-                (err) => alert("Error: " + err.message),
-                { enableHighAccuracy: true, maximumAge: 2000, timeout: 5000 }
-            );
-        }
-
-        function detenerSeguimiento() {
-            if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
-            document.getElementById("compartir-info").style.display = "none";
-            document.getElementById("btnDetener").style.display = "none";
-        }
-
-        function limpiarRecorrido() {
-            puntosRecorrido = [];
-            if (lineaRecorrido) lineaRecorrido.setPath([]);
-        }
-
-        function copiarEnlace() {
-            navigator.clipboard.writeText(document.getElementById("enlaceUbicacion").href)
-                .then(() => alert("Enlace copiado ✅"))
-                .catch(() => alert("No se pudo copiar"));
         }
 
         window.onload = iniciarMapa;
