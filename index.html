@@ -3,122 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rutas Transporte Lima</title>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places"></script>
+    <title>Rutas Autobuses - Google Maps</title>
     <style>
-        * {margin:0; padding:0; box-sizing:border-box; font-family:Arial, sans-serif;}
-        body {display:flex; flex-direction:column; height:100vh;}
-        .panel {padding:15px; background:#f8f9fa; border-bottom:1px solid #ddd;}
-        .fila {display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;}
-        input {flex:1; padding:10px; border:1px solid #ccc; border-radius:4px; font-size:16px;}
-        button {padding:10px 15px; border:none; border-radius:4px; cursor:pointer; font-weight:bold;}
-        .btn-ubi {background:#2196F3; color:white;}
-        .btn-buscar {background:#4CAF50; color:white;}
-        #map {flex:1; width:100%;}
-        #resultados {max-height:220px; overflow-y:auto; padding:12px; background:white; border-top:1px solid #ddd;}
-        .ruta {margin:8px 0; padding:10px; border-left:4px solid #007bff; background:#f0f8ff; border-radius:3px;}
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+        body { display: flex; flex-direction: column; height: 100vh; }
+        .panel { padding: 15px; background: #f8f9fa; border-bottom: 1px solid #ddd; }
+        .campo { margin: 8px 0; width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; }
+        button { padding: 10px 15px; margin: 5px 5px 5px 0; border: none; border-radius: 4px; cursor: pointer; font-size: 15px; }
+        .btn-ubicacion { background: #2196F3; color: white; }
+        .btn-calcular { background: #4CAF50; color: white; }
+        #mapa { flex: 1; width: 100%; }
+        #info-ruta { margin-top: 10px; padding: 10px; background: #fff; border-radius: 4px; max-height: 200px; overflow-y: auto; font-size: 14px; }
     </style>
 </head>
 <body>
-    <div class="panel">
-        <div class="fila">
-            <input type="text" id="origen" placeholder="Dirección de partida">
-            <button class="btn-ubi" onclick="usarUbicacion()">📍 Ubicación actual</button>
-        </div>
-        <div class="fila">
-            <input type="text" id="destino" placeholder="Dirección de destino">
-            <button class="btn-buscar" onclick="calcularRuta()">🚌 Ver rutas</button>
-        </div>
-    </div>
-    <div id="map"></div>
-    <div id="resultados"></div>
 
-    <script>
-        let mapa, servicioDirecciones, visualizador, autocompletarOrigen, autocompletarDestino;
+<div class="panel">
+    <input type="text" id="origen" class="campo" placeholder="Dirección de partida">
+    <button class="btn-ubicacion" onclick="usarUbicacionActual()">📍 Usar mi ubicación</button>
+    <input type="text" id="destino" class="campo" placeholder="Dirección de destino">
+    <button class="btn-calcular" onclick="calcularRuta()">🚌 Ver rutas de autobús</button>
+    <div id="info-ruta"></div>
+</div>
 
-        function inicializarMapa() {
-            // Centro inicial: Lima
-            const centro = {lat: -12.0464, lng: -77.0428};
-            mapa = new google.maps.Map(document.getElementById("map"), {
-                zoom: 13,
-                center: centro,
-                language: "es",
-                region: "PE"
-            });
+<div id="mapa"></div>
 
-            servicioDirecciones = new google.maps.DirectionsService();
-            visualizador = new google.maps.DirectionsRenderer({suppressMarkers: false});
-            visualizador.setMap(mapa);
+<script>
+let mapa, servicioDirecciones, renderizadorDirecciones, autocompletarOrigen, autocompletarDestino;
 
-            // Autocompletar direcciones
-            autocompletarOrigen = new google.maps.places.Autocomplete(document.getElementById("origen"), {componentRestrictions: {country: "pe"}});
-            autocompletarDestino = new google.maps.places.Autocomplete(document.getElementById("destino"), {componentRestrictions: {country: "pe"}});
-        }
+// Inicializar mapa
+function iniciarMapa() {
+    mapa = new google.maps.Map(document.getElementById("mapa"), {
+        center: { lat: 40.4168, lng: -3.7038 }, // Madrid como centro inicial
+        zoom: 13
+    });
 
-        // 📍 Ubicación automática
-        function usarUbicacion() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (pos) => {
-                        const coords = {lat: pos.coords.latitude, lng: pos.coords.longitude};
-                        new google.maps.Geocoder().geocode({location: coords}, (res) => {
-                            if (res[0]) document.getElementById("origen").value = res[0].formatted_address;
-                            mapa.setCenter(coords);
-                        });
-                    },
-                    () => alert("No se pudo obtener ubicación. Activa el GPS.")
-                );
-            } else alert("Tu navegador no admite geolocalización");
-        }
+    servicioDirecciones = new google.maps.DirectionsService();
+    renderizadorDirecciones = new google.maps.DirectionsRenderer({ map: mapa });
 
-        // 🚌 Calcular ruta en transporte público
-        function calcularRuta() {
-            const origen = document.getElementById("origen").value;
-            const destino = document.getElementById("destino").value;
-            if (!origen || !destino) return alert("Completa origen y destino");
+    // Autocompletar direcciones
+    autocompletarOrigen = new google.maps.places.Autocomplete(document.getElementById("origen"));
+    autocompletarDestino = new google.maps.places.Autocomplete(document.getElementById("destino"));
+}
 
-            servicioDirecciones.route({
-                origin: origen,
-                destination: destino,
-                travelMode: "TRANSIT",
-                region: "PE",
-                language: "es",
-                transitOptions: {modes: ["BUS", "RAIL"], routingPreference: "LESS_WALKING"}
-            }, (respuesta, estado) => {
-                if (estado === "OK") {
-                    visualizador.setDirections(respuesta);
-                    mostrarResultados(respuesta);
-                } else {
-                    document.getElementById("resultados").innerHTML = "❌ No se encontraron rutas. Prueba otra dirección.";
-                }
-            });
-        }
-
-        // 📋 Mostrar líneas detalladas
-        function mostrarResultados(datos) {
-            const contenedor = document.getElementById("resultados");
-            let html = "<h4>Opciones de viaje:</h4>";
-            datos.routes.forEach((ruta, idx) => {
-                const tramo = ruta.legs[0];
-                html += `<div class="ruta"><strong>Opción ${idx+1}:</strong><br>
-                         ⏱️ Duración: ${tramo.duration.text}<br>
-                         📏 Distancia: ${tramo.distance.text}<br>
-                         🚏 Pasos:<ol>`;
-                tramo.steps.forEach(paso => {
-                    if (paso.travelMode === "TRANSIT") {
-                        const linea = paso.transit.line;
-                        const tipo = linea.vehicle.name;
-                        html += `<li><strong>${tipo}:</strong> ${linea.short_name || linea.name} → ${paso.instructions}</li>`;
-                    } else {
-                        html += `<li>🚶 ${paso.instructions}</li>`;
-                    }
+// Obtener ubicación automática
+function usarUbicacionActual() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const ubicacion = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                mapa.setCenter(ubicacion);
+                // Convertir coordenadas a dirección legible
+                new google.maps.Geocoder().geocode({ location: ubicacion }, (res) => {
+                    if (res[0]) document.getElementById("origen").value=res[0].formatted_address;
                 });
-                html += `</ol></div>`;
-            });
-            contenedor.innerHTML = html;
-        }
+            },
+            () => alert("No se pudo acceder a tu ubicación")
+        );
+    } else alert("Tu navegador no soporta geolocalización");
+}
 
-        google.maps.event.addDomListener(window, "load", inicializarMapa);
-    </script>
+// Calcular ruta en transporte público (autobús prioritario)
+function calcularRuta() {
+    const origen = document.getElementById("origen").value;
+    const destino = document.getElementById("destino").value;
+
+    if (!origen || !destino) {
+        alert("Completa origen y destino");
+        return;
+    }
+
+    const solicitud = {
+        origin: origen,
+        destination: destino,
+        travelMode: "TRANSIT",
+        transitOptions: { modes: ["BUS"] } // Priorizar autobuses
+    };
+
+    servicioDirecciones.route(solicitud, (resultado, estado) => {
+        if (estado === "OK") {
+            renderizadorDirecciones.setDirections(resultado);
+            mostrarDetallesRuta(resultado);
+        } else {
+            document.getElementById("info-ruta").innerHTML = "❌ No se encontró ruta en autobús.";
+        }
+    });
+}
+
+// Mostrar líneas de autobús y detalles
+function mostrarDetallesRuta(resultado) {
+    const ruta = resultado.routes[0].legs[0];
+    let html = `<strong>📅 Duración:</strong> ${ruta.duration.text}<br>
+                <strong>📏 Distancia:</strong> ${ruta.distance.text}<br><br>
+                <strong>🚌 Líneas y pasos:</strong><br>`;
+
+    ruta.steps.forEach(paso => {
+        if (paso.travel_mode === "TRANSIT") {
+            const linea = paso.transit.line;
+            html += `• <strong>Línea ${linea.short_name || linea.name}</strong> (${linea.vehicle.type})<br>
+                     📍 Desde: ${paso.transit.departure_stop.name}<br>
+                     📍 Hasta: ${paso.transit.arrival_stop.name}<br>
+                     ⏱ Duración: ${paso.duration.text}<br><br>`;
+        } else {
+            html += `• ${paso.instructions} (${paso.distance.text})<br>`;
+        }
+    });
+
+    document.getElementById("info-ruta").innerHTML=html;
+}
+</script>
+
+<!-- Cargar Google Maps con todas las bibliotecas necesarias -->
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places&callback=iniciarMapa&language=es"></script>
+
 </body>
 </html>
