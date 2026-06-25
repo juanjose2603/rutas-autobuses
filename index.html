@@ -2,49 +2,50 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rutas Transporte - Lista debajo del mapa</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Rutas Transporte - Optimizada para Móvil</title>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
         html, body { height: 100%; overflow: hidden; display: flex; flex-direction: column; }
 
-        /* Panel superior compacto */
+        /* --------------------------
+        PANEL SUPERIOR - CAMPOS EN LÍNEAS SEPARADAS
+        -------------------------- */
         .panel-superior {
             padding: 8px 10px;
             background: #f8f9fa;
             border-bottom: 1px solid #ddd;
+            flex-shrink: 0;
         }
 
-        /* Campos en la misma fila */
-        .fila-campos {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 8px;
-        }
+        /* Campos en líneas diferentes */
         .campo {
-            flex: 1;
-            padding: 7px 8px;
+            width: 100%;
+            padding: 9px 10px;
+            margin: 6px 0;
             border: 1px solid #ccc;
             border-radius: 4px;
-            font-size: 14px;
+            font-size: 15px;
         }
+        .campo::placeholder { font-size: 14px; color: #888; }
 
-        /* Botones más pequeños */
+        /* Botones adaptados para móvil */
         .fila-botones {
             display: flex;
             flex-wrap: wrap;
-            gap: 6px;
-            margin-bottom: 6px;
+            gap: 8px;
+            margin: 8px 0;
         }
         button {
-            padding: 6px 10px;
+            padding: 8px 12px;
             border: none;
             border-radius: 4px;
             cursor: pointer;
             font-weight: 500;
-            font-size: 12px;
-            line-height: 1.2;
+            font-size: 13px;
+            flex: 1;
+            min-width: 80px;
         }
         .btn-azul { background: #1a73e8; color: white; }
         .btn-verde { background: #34a853; color: white; }
@@ -52,28 +53,34 @@
         .btn-gris { background: #70757a; color: white; }
         button:hover { opacity: 0.9; }
 
-        /* Compartir ubicación más pequeño */
+        /* Info de seguimiento */
         #compartir-info {
-            padding: 5px 8px;
+            padding: 6px 10px;
             background: #e8f0fe;
             border-radius: 4px;
             display: none;
-            font-size: 11px;
-            margin-bottom: 4px;
+            font-size: 12px;
+            margin-top: 6px;
         }
         #compartir-info button {
-            padding: 3px 6px;
-            font-size: 10px;
+            padding: 4px 8px;
+            font-size: 11px;
+            flex: none;
         }
 
-        /* Mapa con altura ajustada */
+        /* --------------------------
+        MAPA - ALTURA ADAPTADA
+        -------------------------- */
         #map {
             width: 100%;
             height: 45vh;
             border-bottom: 1px solid #ddd;
+            flex-shrink: 0;
         }
 
-        /* Sección de rutas con más espacio */
+        /* --------------------------
+        SECCIÓN DE RUTAS - MÁS ESPACIO
+        -------------------------- */
         .seccion-rutas {
             padding: 10px;
             background: #ffffff;
@@ -81,16 +88,16 @@
             flex: 1;
         }
         .titulo-seccion {
-            font-size: 15px;
+            font-size: 16px;
             font-weight: bold;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             color: #333;
         }
         .ruta-item {
             border: 1px solid #eee;
             border-radius: 6px;
-            padding: 10px;
-            margin-bottom: 10px;
+            padding: 12px;
+            margin-bottom: 12px;
             cursor: pointer;
             transition: all 0.2s ease;
         }
@@ -104,44 +111,44 @@
         }
         .ruta-titulo {
             font-weight: bold;
-            margin-bottom: 6px;
-            font-size: 14px;
+            margin-bottom: 8px;
+            font-size: 15px;
         }
         .detalles-ruta {
-            font-size: 13px;
+            font-size: 14px;
             color: #555;
             margin-left: 8px;
         }
-        .linea {
-            margin: 5px 0;
-        }
-        .a-pie {
-            color: #70757a;
-            font-style: italic;
-        }
-        .horario {
-            font-size: 12px;
-            color: #666;
-            margin-left: 12px;
-        }
+        .linea { margin: 6px 0; }
+        .a-pie { color: #70757a; font-style: italic; }
+        .horario { font-size: 13px; color: #666; margin-left: 12px; }
 
         /* Colores por ruta */
         .ruta1 { color: #1a73e8; }
         .ruta2 { color: #34a853; }
         .ruta3 { color: #fbbc05; }
         .ruta4 { color: #ea4335; }
+
+        /* --------------------------
+        AJUSTES ESPECÍFICOS PARA MÓVILES
+        -------------------------- */
+        @media (max-width: 480px) {
+            #map { height: 40vh; }
+            .campo { font-size: 16px; padding: 10px; }
+            button { font-size: 14px; padding: 9px; }
+            .ruta-titulo { font-size: 16px; }
+            .detalles-ruta { font-size: 15px; }
+            .titulo-seccion { font-size: 17px; }
+        }
     </style>
 </head>
 <body>
     <!-- Panel superior -->
     <div class="panel-superior">
-        <!-- Campos en la misma línea -->
-        <div class="fila-campos">
-            <input type="text" id="origen" class="campo" placeholder="Origen">
-            <input type="text" id="destino" class="campo" placeholder="Destino">
-        </div>
+        <!-- ORIGEN Y DESTINO EN LÍNEAS SEPARADAS -->
+        <input type="text" id="origen" class="campo" placeholder="📍 Dirección de origen">
+        <input type="text" id="destino" class="campo" placeholder="🏁 Dirección de destino">
 
-        <!-- Botones más pequeños -->
         <div class="fila-botones">
             <button class="btn-azul" onclick="usarMiUbicacion()">📍 Mi ubicación</button>
             <button class="btn-azul" onclick="calcularRuta()">🚌 Buscar rutas</button>
@@ -151,7 +158,7 @@
         </div>
 
         <div id="compartir-info">
-            <p>✅ Seguimiento activo | <a id="enlaceUbicacion" href="#" target="_blank">Ver ubicación</a> <button onclick="copiarEnlace()">Copiar</button></p>
+            <p>✅ Seguimiento activo | <a id="enlaceUbicacion" href="#" target="_blank">Ver en mapa</a> <button onclick="copiarEnlace()">Copiar</button></p>
         </div>
     </div>
 
@@ -169,6 +176,7 @@
         let lineaRecorrido = null, puntosRecorrido = [];
         let respuestaCompleta = null;
         let elementosRuta = [];
+        let etiquetasRuta = []; // Para guardar los números visibles en el mapa
 
         const COLORES = ["#1a73e8", "#34a853", "#fbbc05", "#ea4335"];
         const COLOR_PIE = "#909090";
@@ -185,7 +193,8 @@
         function iniciarMapa() {
             mapa = new google.maps.Map(document.getElementById("map"), {
                 center: { lat: 19.4326, lng: -99.1332 },
-                zoom: 12
+                zoom: 12,
+                gestureHandling: "greedy" // Mejor desplazamiento en móviles
             });
             servicioDirecciones = new google.maps.DirectionsService();
             new google.maps.places.Autocomplete(document.getElementById("origen"));
@@ -194,7 +203,7 @@
         }
 
         function usarMiUbicacion() {
-            if (!navigator.geolocation) return alert("Geolocalización no soportada");
+            if (!navigator.geolocation) return alert("Geolocalización no soportada en tu dispositivo");
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
                     const ubicacion = { lat: pos.coords.latitude, lng: pos.coords.longitude };
@@ -213,18 +222,19 @@
                         if (res[0]) document.getElementById("origen").value = res[0].formatted_address;
                     });
                 },
-                () => alert("No se pudo obtener la ubicación")
+                () => alert("No se pudo obtener la ubicación. Revisa los permisos de tu navegador."),
+                { enableHighAccuracy: true }
             );
         }
 
         function calcularRuta() {
             const origen = document.getElementById("origen").value.trim();
             const destino = document.getElementById("destino").value.trim();
-            if (!origen || !destino) return alert("Completa ambos campos");
+            if (!origen || !destino) return alert("Completa las direcciones de origen y destino");
 
             limpiarRutaAnterior();
             respuestaCompleta = null;
-            document.getElementById("lista-rutas").innerHTML = "🔄 Buscando rutas...";
+            document.getElementById("lista-rutas").innerHTML = "🔄 Buscando rutas disponibles...";
 
             const solicitud = {
                 origin: origen,
@@ -239,7 +249,7 @@
 
             servicioDirecciones.route(solicitud, (respuesta, estado) => {
                 if (estado !== "OK") {
-                    document.getElementById("lista-rutas").innerHTML = "❌ No se encontraron rutas";
+                    document.getElementById("lista-rutas").innerHTML = "❌ No se encontraron rutas para este trayecto";
                     return;
                 }
                 respuestaCompleta = respuesta;
@@ -249,7 +259,9 @@
 
         function limpiarRutaAnterior() {
             elementosRuta.forEach(el => { if (el && el.setMap) el.setMap(null); });
+            etiquetasRuta.forEach(el => { if (el && el.setMap) el.setMap(null); });
             elementosRuta = [];
+            etiquetasRuta = [];
         }
 
         function mostrarListaRutas() {
@@ -283,7 +295,7 @@
                             tipoTexto = numeroRuta.startsWith("R") ? "Corredor" :
                                         numeroRuta.startsWith("A") ? "Alimentador" : "Autobús";
                         } else if (tipo === "SUBWAY") tipoTexto = "Metro";
-                        else if (tipo === "TRAIN" || tipo === "RAIL") tipoTexto = "Metropolitano / Tren";
+                        else if (tipo === "TRAIN" || tipo === "RAIL") tipoTexto = "Tren / Metropolitano";
 
                         contenido += `<div class="linea">✅ ${tipoTexto}: <strong>${numeroRuta}</strong></div>`;
                         contenido += `<div class="horario">⏱️ Salida: ${paso.transit.departure_time?.text || "?"} → Llegada: ${paso.transit.arrival_time?.text || "?"}</div>`;
@@ -313,16 +325,37 @@
 
             tramo.steps.forEach(paso => {
                 if (!paso || !paso.path) return;
+
+                // Dibujar el trazo
                 const trazo = new google.maps.Polyline({
                     path: paso.path,
                     geodesic: true,
                     strokeColor: paso.travel_mode === "TRANSIT" ? colorRuta : COLOR_PIE,
-                    strokeWeight: paso.travel_mode === "TRANSIT" ? 6 : 3,
-                    strokeOpacity: paso.travel_mode === "TRANSIT" ? 0.9 : 0.7,
+                    strokeWeight: paso.travel_mode === "TRANSIT" ? 7 : 3,
+                    strokeOpacity: paso.travel_mode === "TRANSIT" ? 0.95 : 0.7,
                     icons: paso.travel_mode === "WALKING" ? ESTILO_PIE.icons : []
                 });
                 trazo.setMap(mapa);
                 elementosRuta.push(trazo);
+
+                // ✅ MOSTRAR NÚMERO DE RUTA SOBRE EL MAPA
+                if (paso.travel_mode === "TRANSIT" && paso.transit) {
+                    const linea = paso.transit.line;
+                    if (!linea) return;
+                    const numeroRuta = linea.short_name || linea.name || "";
+                    if (!numeroRuta) return;
+
+                    // Posición central para colocar el número
+                    const puntoMedio = paso.path[Math.floor(paso.path.length / 2)];
+
+                    const etiqueta = new google.maps.InfoWindow({
+                        position: puntoMedio,
+                        content: `<div style="background:${colorRuta}; color:white; padding:2px 6px; border-radius:12px; font-size:12px; font-weight:bold; text-align:center; min-width:24px; box-shadow:0 1px 3px rgba(0,0,0,0.3);">${numeroRuta}</div>`,
+                        disableAutoPan: true
+                    });
+                    etiqueta.open(mapa);
+                    etiquetasRuta.push(etiqueta);
+                }
             });
 
             mapa.fitBounds(tramo.bounds);
@@ -358,7 +391,7 @@
                     document.getElementById("enlaceUbicacion").href = `https://www.google.com/maps?q=${lat},${lng}`;
                     document.getElementById("enlaceUbicacion").textContent = `${lat}, ${lng}`;
                 },
-                (err) => alert("Error: " + err.message),
+                (err) => alert("Error de ubicación: " + err.message),
                 { enableHighAccuracy: true, maximumAge: 2000, timeout: 5000 }
             );
         }
@@ -376,7 +409,7 @@
 
         function copiarEnlace() {
             navigator.clipboard.writeText(document.getElementById("enlaceUbicacion").href)
-                .then(() => alert("Copiado ✅"))
+                .then(() => alert("Enlace copiado ✅"))
                 .catch(() => alert("No se pudo copiar"));
         }
 
