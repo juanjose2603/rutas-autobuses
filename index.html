@@ -3,118 +3,137 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rutas Autobuses - Google Maps</title>
+    <title>Rutas de Transporte Público</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
         body { display: flex; flex-direction: column; height: 100vh; }
-        .panel { padding: 15px; background: #f8f9fa; border-bottom: 1px solid #ddd; }
+        .panel { padding: 12px; background: #f8f9fa; border-bottom: 1px solid #ddd; }
         .campo { margin: 8px 0; width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; }
-        button { padding: 10px 15px; margin: 5px 5px 5px 0; border: none; border-radius: 4px; cursor: pointer; font-size: 15px; }
-        .btn-ubicacion { background: #2196F3; color: white; }
-        .btn-calcular { background: #4CAF50; color: white; }
-        #mapa { flex: 1; width: 100%; }
-        #info-ruta { margin-top: 10px; padding: 10px; background: #fff; border-radius: 4px; max-height: 200px; overflow-y: auto; font-size: 14px; }
+        button { padding: 10px 16px; background: #1a73e8; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-right: 8px; }
+        button:hover { background: #1557b0; }
+        #map { flex: 1; width: 100%; }
+        #rutas { margin-top: 12px; max-height: 220px; overflow-y: auto; background: white; padding: 10px; border-radius: 4px; border: 1px solid #eee; font-size: 14px; }
+        .linea { font-weight: bold; color: #0b8043; }
     </style>
 </head>
 <body>
+    <div class="panel">
+        <input type="text" id="origen" class="campo" placeholder="Origen — se detecta automáticamente">
+        <input type="text" id="destino" class="campo" placeholder="Dirección de llegada">
+        <button onclick="usarMiUbicacion()">Usar mi ubicación</button>
+        <button onclick="calcularRuta()">Ver rutas</button>
+        <div id="rutas"></div>
+    </div>
+    <div id="map"></div>
 
-<div class="panel">
-    <input type="text" id="origen" class="campo" placeholder="Dirección de partida">
-    <button class="btn-ubicacion" onclick="usarUbicacionActual()">📍 Usar mi ubicación</button>
-    <input type="text" id="destino" class="campo" placeholder="Dirección de destino">
-    <button class="btn-calcular" onclick="calcularRuta()">🚌 Ver rutas de autobús</button>
-    <div id="info-ruta"></div>
-</div>
+    <script>
+        let mapa, servicioDirecciones, visualizadorRuta;
 
-<div id="mapa"></div>
+        // Inicializar mapa
+        function iniciarMapa() {
+            mapa = new google.maps.Map(document.getElementById("map"), {
+                center: { lat: 19.4326, lng: -99.1332 }, // CDMX por defecto
+                zoom: 12
+            });
 
-<script>
-let mapa, servicioDirecciones, renderizadorDirecciones, autocompletarOrigen, autocompletarDestino;
+            servicioDirecciones = new google.maps.DirectionsService();
+            visualizadorRuta = new google.maps.DirectionsRenderer({ map: mapa });
 
-// Inicializar mapa
-function iniciarMapa() {
-    mapa = new google.maps.Map(document.getElementById("mapa"), {
-        center: { lat: 40.4168, lng: -3.7038 }, // Madrid como centro inicial
-        zoom: 13
-    });
+            // Autocompletar direcciones
+            new google.maps.places.Autocomplete(document.getElementById("origen"));
+            new google.maps.places.Autocomplete(document.getElementById("destino"));
 
-    servicioDirecciones = new google.maps.DirectionsService();
-    renderizadorDirecciones = new google.maps.DirectionsRenderer({ map: mapa });
+            // Detectar ubicación automáticamente al cargar
+            usarMiUbicacion();
+        }
 
-    // Autocompletar direcciones
-    autocompletarOrigen = new google.maps.places.Autocomplete(document.getElementById("origen"));
-    autocompletarDestino = new google.maps.places.Autocomplete(document.getElementById("destino"));
-}
+        // Obtener ubicación actual
+        function usarMiUbicacion() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        const ubicacion = {
+                            lat: pos.coords.latitude,
+                            lng: pos.coords.longitude
+                        };
+                        mapa.setCenter(ubicacion);
+                        // Convertir coordenadas a dirección legible
+                        new google.maps.Geocoder().geocode({ location: ubicacion }, (res) => {
+                            if (res[0]) document.getElementById("origen").value = res[0].formatted_address;
+                        });
+                    },
+                    () => alert("No se pudo acceder a tu ubicación. Revisa permisos.")
+                );
+            } else {
+                alert("Tu navegador no soporta geolocalización");
+            }
+        }
 
-// Obtener ubicación automática
-function usarUbicacionActual() {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                const ubicacion = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                mapa.setCenter(ubicacion);
-                // Convertir coordenadas a dirección legible
-                new google.maps.Geocoder().geocode({ location: ubicacion }, (res) => {
-                    if (res[0]) document.getElementById("origen").value=res[0].formatted_address;
+        // Calcular rutas de transporte público
+        function calcularRuta() {
+            const origen = document.getElementById("origen").value;
+            const destino = document.getElementById("destino").value;
+
+            if (!origen || !destino) {
+                alert("Completa ambas direcciones");
+                return;
+            }
+
+            const solicitud = {
+                origin: origen,
+                destination: destino,
+                travelMode: "TRANSIT", // Modo transporte público
+                transitOptions: {
+                    modes: ["BUS", "SUBWAY", "TRAIN"], // Autobús, Metro, Tren/Metropolitano
+                    routingPreference: "FEWER_TRANSFERS"
+                },
+                provideRouteAlternatives: true
+            };
+
+            servicioDirecciones.route(solicitud, (respuesta, estado) => {
+                if (estado === "OK") {
+                    visualizadorRuta.setDirections(respuesta);
+                    mostrarDetallesRutas(respuesta);
+                } else {
+                    document.getElementById("rutas").innerHTML = "No se encontraron rutas de transporte público.";
+                }
+            });
+        }
+
+        // Mostrar líneas, corredores, alimentadores
+        function mostrarDetallesRutas(respuesta) {
+            const contenedor = document.getElementById("rutas");
+            let html = "<h4>Rutas disponibles:</h4>";
+
+            respuesta.routes.forEach((ruta, i) => {
+                const tramo = ruta.legs[0];
+                html += `<p><strong>Ruta ${i+1}</strong> — Duración: ${tramo.duration.text} | Distancia: ${tramo.distance.text}</p><ul>`;
+
+                tramo.steps.forEach(paso => {
+                    if (paso.travel_mode === "TRANSIT") {
+                        const linea = paso.transit.line;
+                        const tipo = linea.vehicle.type;
+                        let nombreTipo = "";
+
+                        // Clasificar tipos según nomenclatura CDMX
+                        if (tipo === "BUS") nombreTipo = linea.short_name?.startsWith("R") ? "Corredor" : linea.short_name?.startsWith("A") ? "Alimentador" : "Autobús";
+                        if (tipo === "SUBWAY") nombreTipo = "Metro";
+                        if (tipo === "TRAIN" || tipo === "RAIL") nombreTipo = "Metropolitano / Tren";
+
+                        html += `<li class="linea">${nombreTipo}: ${linea.short_name || linea.name}</li>
+                                 <li>De: ${paso.transit.departure_stop.name} → Hasta: ${paso.transit.arrival_stop.name}</li>`;
+                    } else {
+                        html += `<li>A pie: ${paso.distance.text}</li>`;
+                    }
                 });
-            },
-            () => alert("No se pudo acceder a tu ubicación")
-        );
-    } else alert("Tu navegador no soporta geolocalización");
-}
+                html += "</ul><hr>";
+            });
 
-// Calcular ruta en transporte público (autobús prioritario)
-function calcularRuta() {
-    const origen = document.getElementById("origen").value;
-    const destino = document.getElementById("destino").value;
-
-    if (!origen || !destino) {
-        alert("Completa origen y destino");
-        return;
-    }
-
-    const solicitud = {
-        origin: origen,
-        destination: destino,
-        travelMode: "TRANSIT",
-        transitOptions: { modes: ["BUS"] } // Priorizar autobuses
-    };
-
-    servicioDirecciones.route(solicitud, (resultado, estado) => {
-        if (estado === "OK") {
-            renderizadorDirecciones.setDirections(resultado);
-            mostrarDetallesRuta(resultado);
-        } else {
-            document.getElementById("info-ruta").innerHTML = "❌ No se encontró ruta en autobús.";
+            contenedor.innerHTML = html;
         }
-    });
-}
 
-// Mostrar líneas de autobús y detalles
-function mostrarDetallesRuta(resultado) {
-    const ruta = resultado.routes[0].legs[0];
-    let html = `<strong>📅 Duración:</strong> ${ruta.duration.text}<br>
-                <strong>📏 Distancia:</strong> ${ruta.distance.text}<br><br>
-                <strong>🚌 Líneas y pasos:</strong><br>`;
-
-    ruta.steps.forEach(paso => {
-        if (paso.travel_mode === "TRANSIT") {
-            const linea = paso.transit.line;
-            html += `• <strong>Línea ${linea.short_name || linea.name}</strong> (${linea.vehicle.type})<br>
-                     📍 Desde: ${paso.transit.departure_stop.name}<br>
-                     📍 Hasta: ${paso.transit.arrival_stop.name}<br>
-                     ⏱ Duración: ${paso.duration.text}<br><br>`;
-        } else {
-            html += `• ${paso.instructions} (${paso.distance.text})<br>`;
-        }
-    });
-
-    document.getElementById("info-ruta").innerHTML=html;
-}
-</script>
-
-<!-- Cargar Google Maps con todas las bibliotecas necesarias -->
-<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places&callback=iniciarMapa&language=es"></script>
-
+        window.onload = iniciarMapa;
+    </script>
 </body>
 </html>
