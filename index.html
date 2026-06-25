@@ -38,7 +38,7 @@
         <button class="btn-gris" onclick="limpiarRecorrido()">🧹 Limpiar recorrido</button>
         <button class="btn-rojo" onclick="detenerSeguimiento()" id="btnDetener" style="display:none;">⏹️ Detener seguimiento</button>
 
-        <!-- 🆕 Menú desplegable para elegir ruta -->
+        <!-- Menú desplegable -->
         <select id="selectorRutas" style="display: none;" onchange="mostrarRutaSeleccionada()">
             <option value="">Selecciona una ruta</option>
         </select>
@@ -57,7 +57,8 @@
     <script>
         let mapa, servicioDirecciones, marcadorUbicacion, watchId = null;
         let lineaRecorrido = null, puntosRecorrido = [];
-        let todasLasRutas = [], renderizadorActivo = null;
+        let respuestaCompleta = null; // Guardamos toda la respuesta correctamente
+        let renderizadorActivo = null;
         const COLORES = ["#1a73e8", "#34a853", "#fbbc05", "#ea4335"];
 
         function iniciarMapa() {
@@ -72,7 +73,7 @@
         }
 
         function usarMiUbicacion() {
-            if (!navigator.geolocation) return alert("Geolocalización no soportada");
+            if (!navigator.geolocation) return alert("Geolocalización no soportada en tu navegador");
             navigator.geolocation.getCurrentPosition(pos => {
                 const ubicacion = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                 mapa.setCenter(ubicacion);
@@ -80,7 +81,7 @@
                     marcadorUbicacion = new google.maps.Marker({
                         position: ubicacion,
                         map: mapa,
-                        title: "Mi ubicación",
+                        title: "Mi ubicación actual",
                         icon: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png"
                     });
                 } else {
@@ -89,17 +90,17 @@
                 new google.maps.Geocoder().geocode({ location: ubicacion }, res => {
                     if (res[0]) document.getElementById("origen").value = res[0].formatted_address;
                 });
-            }, () => alert("No se pudo obtener ubicación"));
+            }, () => alert("No se pudo obtener la ubicación. Revisa los permisos."));
         }
 
-        // Calcular rutas y llenar el menú desplegable
+        // Calcular rutas y llenar el menú
         function calcularRuta() {
             const origen = document.getElementById("origen").value.trim();
             const destino = document.getElementById("destino").value.trim();
-            if (!origen || !destino) return alert("Completa ambos campos");
+            if (!origen || !destino) return alert("Completa ambos campos: origen y destino");
 
             // Limpiar datos anteriores
-            todasLasRutas = [];
+            respuestaCompleta = null;
             if (renderizadorActivo) renderizadorActivo.setMap(null);
             document.getElementById("info-ruta").innerHTML = "";
             const selector = document.getElementById("selectorRutas");
@@ -117,14 +118,16 @@
             servicioDirecciones.route(solicitud, (respuesta, estado) => {
                 if (estado !== "OK") {
                     selector.innerHTML = '<option value="">No se encontraron rutas</option>';
-                    document.getElementById("info-ruta").innerHTML = "No hay rutas disponibles para este trayecto.";
+                    document.getElementById("info-ruta").innerHTML = "❌ No hay rutas disponibles para este trayecto.";
                     return;
                 }
 
-                todasLasRutas = respuesta.routes;
-                // Llenar el menú desplegable
+                // Guardamos la respuesta completa para usarla después
+                respuestaCompleta = respuesta;
+
+                // Llenar menú desplegable
                 selector.innerHTML = '<option value="">Elige una ruta</option>';
-                todasLasRutas.forEach((ruta, indice) => {
+                respuestaCompleta.routes.forEach((ruta, indice) => {
                     const duracion = ruta.legs[0].duration.text;
                     const distancia = ruta.legs[0].distance.text;
                     const opcion = document.createElement("option");
@@ -135,34 +138,34 @@
             });
         }
 
-        // Mostrar en el mapa la ruta elegida en el menú
+        // Mostrar ruta seleccionada en el mapa y detalles
         function mostrarRutaSeleccionada() {
             const indice = parseInt(document.getElementById("selectorRutas").value);
-            if (isNaN(indice) || !todasLasRutas[indice]) return;
+            if (isNaN(indice) || !respuestaCompleta || !respuestaCompleta.routes[indice]) return;
 
             // Borrar ruta anterior
             if (renderizadorActivo) renderizadorActivo.setMap(null);
 
-            // Crear y mostrar la ruta seleccionada
+            // Crear nuevo renderizador con la ruta correcta
             renderizadorActivo = new google.maps.DirectionsRenderer({
                 map: mapa,
-                directions: { routes: todasLasRutas },
+                directions: respuestaCompleta, // Usamos la respuesta completa guardada
                 routeIndex: indice,
                 suppressMarkers: false,
                 polylineOptions: {
-                    strokeColor: COLORES[indice] || "#666",
+                    strokeColor: COLORES[indice] || "#666666",
                     strokeWeight: 6,
                     strokeOpacity: 0.9
                 }
             });
 
-            // Mostrar detalles de la ruta
+            // Mostrar detalles completos con número de línea
             mostrarDetallesRuta(indice);
         }
 
-        // Mostrar información detallada de la ruta seleccionada
+        // Mostrar información detallada con número de ruta
         function mostrarDetallesRuta(indice) {
-            const ruta = todasLasRutas[indice];
+            const ruta = respuestaCompleta.routes[indice];
             const tramo = ruta.legs[0];
             const contenedor = document.getElementById("info-ruta");
             const claseColor = `ruta${indice + 1}`;
@@ -174,6 +177,7 @@
                     const linea = paso.transit.line;
                     const tipo = linea.vehicle.type;
                     let nombreTipo = "";
+                    let numeroRuta = linea.short_name || linea.name || "Sin número";
 
                     if (tipo === "BUS") {
                         nombreTipo = linea.short_name?.startsWith("R") ? "Corredor" :
@@ -184,7 +188,7 @@
                         nombreTipo = "Metropolitano / Tren";
                     }
 
-                    html += `<p class="linea ${claseColor}">✅ ${nombreTipo}: ${linea.short_name || linea.name}</p>
+                    html += `<p class="linea ${claseColor}">✅ ${nombreTipo}: <strong>${numeroRuta}</strong></p>
                              <p class="linea">De: ${paso.transit.departure_stop.name} → Hasta: ${paso.transit.arrival_stop.name}</p>`;
                 } else {
                     html += `<p class="linea">🚶 A pie: ${paso.distance.text}</p>`;
@@ -196,7 +200,7 @@
 
         // Funciones de seguimiento de recorrido
         function iniciarSeguimiento() {
-            if (!navigator.geolocation) return alert("No soportado");
+            if (!navigator.geolocation) return alert("Tu navegador no admite geolocalización");
             if (watchId) detenerSeguimiento();
 
             document.getElementById("compartir-info").style.display = "block";
@@ -223,7 +227,11 @@
 
                 document.getElementById("enlaceUbicacion").href = `https://www.google.com/maps?q=${lat},${lng}`;
                 document.getElementById("enlaceUbicacion").textContent = `${lat}, ${lng}`;
-            }, err => alert("Error: " + err.message), { enableHighAccuracy: true, maximumAge: 2000, timeout: 5000 });
+            }, err => alert("Error al obtener ubicación: " + err.message), {
+                enableHighAccuracy: true,
+                maximumAge: 2000,
+                timeout: 5000
+            });
         }
 
         function detenerSeguimiento() {
@@ -241,7 +249,7 @@
             const enlace = document.getElementById("enlaceUbicacion").href;
             navigator.clipboard.writeText(enlace)
                 .then(() => alert("Enlace copiado ✅"))
-                .catch(() => alert("No se pudo copiar"));
+                .catch(() => alert("No se pudo copiar el enlace"));
         }
 
         window.onload = iniciarMapa;
