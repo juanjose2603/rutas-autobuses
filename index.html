@@ -7,12 +7,31 @@
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
-        body { display: flex; flex-direction: column; height: 100vh; }
+        html, body { height: 100%; overflow: hidden; display: flex; flex-direction: column; }
 
         /* Panel superior */
-        .panel-superior { padding: 12px; background: #f8f9fa; border-bottom: 1px solid #ddd; }
-        .campo { margin: 8px 0; width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; }
-        button { padding: 10px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin: 6px 6px 6px 0; font-size: 14px; }
+        .panel-superior {
+            padding: 12px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #ddd;
+        }
+        .campo {
+            margin: 8px 0;
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 15px;
+        }
+        button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 6px 6px 6px 0;
+            font-size: 14px;
+        }
         .btn-azul { background: #1a73e8; color: white; }
         .btn-verde { background: #34a853; color: white; }
         .btn-rojo { background: #ea4335; color: white; }
@@ -20,41 +39,79 @@
         button:hover { opacity: 0.9; }
 
         /* Mapa */
-        #map { width: 100%; height: 55vh; border-bottom: 1px solid #ddd; }
+        #map {
+            width: 100%;
+            height: 55vh;
+            border-bottom: 1px solid #ddd;
+        }
 
         /* Sección de rutas debajo del mapa */
-        .seccion-rutas { padding: 12px; background: #ffffff; overflow-y: auto; max-height: 40vh; }
-        .titulo-seccion { font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #333; }
+        .seccion-rutas {
+            padding: 12px;
+            background: #ffffff;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .titulo-seccion {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
         .ruta-item {
             border: 1px solid #eee;
             border-radius: 6px;
-            padding: 10px;
-            margin-bottom: 10px;
+            padding: 12px;
+            margin-bottom: 12px;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.2s ease;
         }
         .ruta-item:hover {
             background-color: #f8f9fa;
-            border-color: #ddd;
+            border-color: #ccc;
         }
         .ruta-item.activa {
             background-color: #e8f0fe;
             border-color: #1a73e8;
         }
-        .ruta-titulo { font-weight: bold; margin-bottom: 5px; }
-        .detalles-ruta { font-size: 14px; color: #555; margin-left: 10px; }
-        .linea { margin: 6px 0; }
-        .a-pie { color: #70757a; font-style: italic; }
-        .horario { font-size: 13px; color: #666; margin-left: 15px; }
-
-        /* Compartir ubicación */
-        #compartir-info { margin-top: 10px; padding: 8px; background: #e8f0fe; border-radius: 4px; display: none; font-size: 13px; }
+        .ruta-titulo {
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+        .detalles-ruta {
+            font-size: 14px;
+            color: #555;
+            margin-left: 10px;
+        }
+        .linea {
+            margin: 6px 0;
+        }
+        .a-pie {
+            color: #70757a;
+            font-style: italic;
+        }
+        .horario {
+            font-size: 13px;
+            color: #666;
+            margin-left: 15px;
+        }
 
         /* Colores por ruta */
         .ruta1 { color: #1a73e8; }
         .ruta2 { color: #34a853; }
         .ruta3 { color: #fbbc05; }
         .ruta4 { color: #ea4335; }
+
+        /* Compartir ubicación */
+        #compartir-info {
+            margin-top: 10px;
+            padding: 8px;
+            background: #e8f0fe;
+            border-radius: 4px;
+            display: none;
+            font-size: 13px;
+        }
     </style>
 </head>
 <body>
@@ -79,10 +136,10 @@
     <!-- Mapa -->
     <div id="map"></div>
 
-    <!-- Lista de rutas debajo del mapa -->
+    <!-- LISTA DE RUTAS AQUÍ DEBAJO DEL MAPA -->
     <div class="seccion-rutas">
         <div class="titulo-seccion">Rutas disponibles:</div>
-        <div id="lista-rutas">Escribe origen y destino, luego pulsa "Buscar rutas"</div>
+        <div id="lista-rutas">Escribe el origen y destino, luego pulsa "Buscar rutas"</div>
     </div>
 
     <script>
@@ -115,7 +172,7 @@
         }
 
         function usarMiUbicacion() {
-            if (!navigator.geolocation) return alert("Geolocalización no soportada");
+            if (!navigator.geolocation) return alert("Geolocalización no soportada en tu navegador");
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
                     const ubicacion = { lat: pos.coords.latitude, lng: pos.coords.longitude };
@@ -134,14 +191,14 @@
                         if (res[0]) document.getElementById("origen").value = res[0].formatted_address;
                     });
                 },
-                () => alert("No se pudo obtener ubicación")
+                () => alert("No se pudo obtener la ubicación. Revisa los permisos.")
             );
         }
 
         function calcularRuta() {
             const origen = document.getElementById("origen").value.trim();
             const destino = document.getElementById("destino").value.trim();
-            if (!origen || !destino) return alert("Completa ambos campos");
+            if (!origen || !destino) return alert("Completa ambos campos: origen y destino");
 
             limpiarRutaAnterior();
             respuestaCompleta = null;
@@ -170,13 +227,11 @@
         }
 
         function limpiarRutaAnterior() {
-            elementosRuta.forEach(elemento => {
-                if (elemento && elemento.setMap) elemento.setMap(null);
-            });
+            elementosRuta.forEach(el => { if (el && el.setMap) el.setMap(null); });
             elementosRuta = [];
         }
 
-        // 🆕 Función para mostrar todas las rutas en lista debajo del mapa
+        // ✅ Mostrar rutas en lista debajo del mapa
         function mostrarListaRutas() {
             const contenedor = document.getElementById("lista-rutas");
             contenedor.innerHTML = "";
@@ -187,17 +242,14 @@
                 const distancia = tramo.distance?.text || "Sin distancia";
                 const claseColor = `ruta${indice + 1}`;
 
-                // Crear elemento de ruta
                 const divRuta = document.createElement("div");
                 divRuta.className = "ruta-item";
                 divRuta.id = `ruta-${indice}`;
                 divRuta.onclick = () => seleccionarRuta(indice);
 
-                // Contenido básico
                 let contenido = `<div class="ruta-titulo ${claseColor}">🚏 Ruta ${indice + 1} | ${duracion} | ${distancia}</div>`;
-
-                // Detalles de la ruta
                 contenido += `<div class="detalles-ruta">`;
+
                 tramo.steps.forEach(paso => {
                     if (!paso) return;
                     if (paso.travel_mode === "TRANSIT" && paso.transit) {
@@ -219,33 +271,26 @@
                         contenido += `<div class="linea a-pie">🚶 A pie: ${paso.distance?.text || "?"} | ${paso.duration?.text || "?"}</div>`;
                     }
                 });
-                contenido += `</div>`;
 
+                contenido += `</div>`;
                 divRuta.innerHTML = contenido;
                 contenedor.appendChild(divRuta);
             });
 
-            // Seleccionar automáticamente la primera ruta al cargar
-            if (respuestaCompleta.routes.length > 0) {
-                seleccionarRuta(0);
-            }
+            if (respuestaCompleta.routes.length > 0) seleccionarRuta(0);
         }
 
-        // Seleccionar ruta y mostrarla en el mapa
         function seleccionarRuta(indice) {
             if (isNaN(indice) || !respuestaCompleta || !respuestaCompleta.routes[indice]) return;
 
             limpiarRutaAnterior();
-            // Quitar selección anterior
             document.querySelectorAll(".ruta-item").forEach(el => el.classList.remove("activa"));
-            // Marcar como activa
             document.getElementById(`ruta-${indice}`).classList.add("activa");
 
             const ruta = respuestaCompleta.routes[indice];
             const tramo = ruta.legs[0];
             const colorRuta = COLORES[indice] || "#666666";
 
-            // Dibujar todos los tramos
             tramo.steps.forEach(paso => {
                 if (!paso || !paso.path) return;
                 const trazo = new google.maps.Polyline({
@@ -263,7 +308,7 @@
             mapa.fitBounds(tramo.bounds);
         }
 
-        // Funciones de seguimiento de ubicación
+        // Funciones de seguimiento
         function iniciarSeguimiento() {
             if (!navigator.geolocation) return alert("Tu navegador no admite geolocalización");
             if (watchId) detenerSeguimiento();
