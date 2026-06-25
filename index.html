@@ -25,6 +25,7 @@
         .ruta2 { color: #34a853; font-weight: bold; }
         .ruta3 { color: #fbbc05; font-weight: bold; }
         .ruta4 { color: #ea4335; font-weight: bold; }
+        .a-pie { color: #70757a; font-style: italic; }
     </style>
 </head>
 <body>
@@ -38,7 +39,6 @@
         <button class="btn-gris" onclick="limpiarRecorrido()">🧹 Limpiar recorrido</button>
         <button class="btn-rojo" onclick="detenerSeguimiento()" id="btnDetener" style="display:none;">⏹️ Detener seguimiento</button>
 
-        <!-- Menú desplegable -->
         <select id="selectorRutas" style="display: none;" onchange="mostrarRutaSeleccionada()">
             <option value="">Selecciona una ruta</option>
         </select>
@@ -57,9 +57,11 @@
     <script>
         let mapa, servicioDirecciones, marcadorUbicacion, watchId = null;
         let lineaRecorrido = null, puntosRecorrido = [];
-        let respuestaCompleta = null; // Guardamos toda la respuesta correctamente
-        let renderizadorActivo = null;
+        let respuestaCompleta = null;
+        let elementosRuta = []; // Guardamos todos los trazos para borrarlos después
         const COLORES = ["#1a73e8", "#34a853", "#fbbc05", "#ea4335"];
+        const COLOR_PIE = "#909090"; // Gris para trayectos a pie
+        const ESTILO_PIE = { strokeOpacity: 0.7, strokeWeight: 3, icons: [{ icon: { path: google.maps.SymbolPath.FORWARD_OPEN_ARROW, scale: 2 }, offset: '100%', repeat: '50px' }] };
 
         function iniciarMapa() {
             mapa = new google.maps.Map(document.getElementById("map"), {
@@ -93,15 +95,13 @@
             }, () => alert("No se pudo obtener la ubicación. Revisa los permisos."));
         }
 
-        // Calcular rutas y llenar el menú
         function calcularRuta() {
             const origen = document.getElementById("origen").value.trim();
             const destino = document.getElementById("destino").value.trim();
             if (!origen || !destino) return alert("Completa ambos campos: origen y destino");
 
-            // Limpiar datos anteriores
+            limpiarRutaAnterior();
             respuestaCompleta = null;
-            if (renderizadorActivo) renderizadorActivo.setMap(null);
             document.getElementById("info-ruta").innerHTML = "";
             const selector = document.getElementById("selectorRutas");
             selector.innerHTML = '<option value="">Cargando rutas...</option>';
@@ -122,10 +122,7 @@
                     return;
                 }
 
-                // Guardamos la respuesta completa para usarla después
                 respuestaCompleta = respuesta;
-
-                // Llenar menú desplegable
                 selector.innerHTML = '<option value="">Elige una ruta</option>';
                 respuestaCompleta.routes.forEach((ruta, indice) => {
                     const duracion = ruta.legs[0].duration.text;
@@ -138,32 +135,42 @@
             });
         }
 
-        // Mostrar ruta seleccionada en el mapa y detalles
+        function limpiarRutaAnterior() {
+            elementosRuta.forEach(el => {
+                if (el.setMap) el.setMap(null);
+            });
+            elementosRuta = [];
+        }
+
         function mostrarRutaSeleccionada() {
             const indice = parseInt(document.getElementById("selectorRutas").value);
             if (isNaN(indice) || !respuestaCompleta || !respuestaCompleta.routes[indice]) return;
 
-            // Borrar ruta anterior
-            if (renderizadorActivo) renderizadorActivo.setMap(null);
+            limpiarRutaAnterior();
+            const ruta = respuestaCompleta.routes[indice];
+            const tramo = ruta.legs[0];
+            const colorRuta = COLORES[indice] || "#666666";
 
-            // Crear nuevo renderizador con la ruta correcta
-            renderizadorActivo = new google.maps.DirectionsRenderer({
-                map: mapa,
-                directions: respuestaCompleta, // Usamos la respuesta completa guardada
-                routeIndex: indice,
-                suppressMarkers: false,
-                polylineOptions: {
-                    strokeColor: COLORES[indice] || "#666666",
-                    strokeWeight: 6,
-                    strokeOpacity: 0.9
-                }
+            // Dibujamos cada paso por separado para que se vean los a pie
+            tramo.steps.forEach(paso => {
+                const trazo = new google.maps.Polyline({
+                    path: paso.path,
+                    geodesic: true,
+                    strokeColor: paso.travel_mode === "TRANSIT" ? colorRuta : COLOR_PIE,
+                    strokeWeight: paso.travel_mode === "TRANSIT" ? 6 : 3,
+                    strokeOpacity: paso.travel_mode === "TRANSIT" ? 0.9 : 0.7,
+                    icons: paso.travel_mode === "WALKING" ? ESTILO_PIE.icons : []
+                });
+                trazo.setMap(mapa);
+                elementosRuta.push(trazo);
             });
 
-            // Mostrar detalles completos con número de línea
+            // Ajustar vista del mapa para ver toda la ruta
+            mapa.fitBounds(tramo.bounds);
+
             mostrarDetallesRuta(indice);
         }
 
-        // Mostrar información detallada con número de ruta
         function mostrarDetallesRuta(indice) {
             const ruta = respuestaCompleta.routes[indice];
             const tramo = ruta.legs[0];
@@ -191,14 +198,14 @@
                     html += `<p class="linea ${claseColor}">✅ ${nombreTipo}: <strong>${numeroRuta}</strong></p>
                              <p class="linea">De: ${paso.transit.departure_stop.name} → Hasta: ${paso.transit.arrival_stop.name}</p>`;
                 } else {
-                    html += `<p class="linea">🚶 A pie: ${paso.distance.text}</p>`;
+                    html += `<p class="linea a-pie">🚶 A pie: ${paso.distance.text} (aprox. ${paso.duration.text})</p>`;
                 }
             });
 
             contenedor.innerHTML = html;
         }
 
-        // Funciones de seguimiento de recorrido
+        // Funciones de seguimiento
         function iniciarSeguimiento() {
             if (!navigator.geolocation) return alert("Tu navegador no admite geolocalización");
             if (watchId) detenerSeguimiento();
