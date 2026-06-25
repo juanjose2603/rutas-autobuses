@@ -9,28 +9,42 @@
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
         html, body { height: 100%; overflow: hidden; display: flex; flex-direction: column; }
 
-        /* Panel superior */
+        /* Panel superior compacto */
         .panel-superior {
-            padding: 12px;
+            padding: 8px 10px;
             background: #f8f9fa;
             border-bottom: 1px solid #ddd;
         }
+
+        /* Campos en la misma fila */
+        .fila-campos {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
         .campo {
-            margin: 8px 0;
-            width: 100%;
-            padding: 10px;
+            flex: 1;
+            padding: 7px 8px;
             border: 1px solid #ccc;
             border-radius: 4px;
-            font-size: 15px;
+            font-size: 14px;
+        }
+
+        /* Botones más pequeños */
+        .fila-botones {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 6px;
         }
         button {
-            padding: 10px 16px;
+            padding: 6px 10px;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            font-weight: bold;
-            margin: 6px 6px 6px 0;
-            font-size: 14px;
+            font-weight: 500;
+            font-size: 12px;
+            line-height: 1.2;
         }
         .btn-azul { background: #1a73e8; color: white; }
         .btn-verde { background: #34a853; color: white; }
@@ -38,31 +52,45 @@
         .btn-gris { background: #70757a; color: white; }
         button:hover { opacity: 0.9; }
 
-        /* Mapa */
+        /* Compartir ubicación más pequeño */
+        #compartir-info {
+            padding: 5px 8px;
+            background: #e8f0fe;
+            border-radius: 4px;
+            display: none;
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+        #compartir-info button {
+            padding: 3px 6px;
+            font-size: 10px;
+        }
+
+        /* Mapa con altura ajustada */
         #map {
             width: 100%;
-            height: 55vh;
+            height: 45vh;
             border-bottom: 1px solid #ddd;
         }
 
-        /* Sección de rutas debajo del mapa */
+        /* Sección de rutas con más espacio */
         .seccion-rutas {
-            padding: 12px;
+            padding: 10px;
             background: #ffffff;
             overflow-y: auto;
             flex: 1;
         }
         .titulo-seccion {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: bold;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             color: #333;
         }
         .ruta-item {
             border: 1px solid #eee;
             border-radius: 6px;
-            padding: 12px;
-            margin-bottom: 12px;
+            padding: 10px;
+            margin-bottom: 10px;
             cursor: pointer;
             transition: all 0.2s ease;
         }
@@ -76,25 +104,25 @@
         }
         .ruta-titulo {
             font-weight: bold;
-            margin-bottom: 8px;
-            font-size: 15px;
+            margin-bottom: 6px;
+            font-size: 14px;
         }
         .detalles-ruta {
-            font-size: 14px;
+            font-size: 13px;
             color: #555;
-            margin-left: 10px;
+            margin-left: 8px;
         }
         .linea {
-            margin: 6px 0;
+            margin: 5px 0;
         }
         .a-pie {
             color: #70757a;
             font-style: italic;
         }
         .horario {
-            font-size: 13px;
+            font-size: 12px;
             color: #666;
-            margin-left: 15px;
+            margin-left: 12px;
         }
 
         /* Colores por ruta */
@@ -102,44 +130,38 @@
         .ruta2 { color: #34a853; }
         .ruta3 { color: #fbbc05; }
         .ruta4 { color: #ea4335; }
-
-        /* Compartir ubicación */
-        #compartir-info {
-            margin-top: 10px;
-            padding: 8px;
-            background: #e8f0fe;
-            border-radius: 4px;
-            display: none;
-            font-size: 13px;
-        }
     </style>
 </head>
 <body>
     <!-- Panel superior -->
     <div class="panel-superior">
-        <input type="text" id="origen" class="campo" placeholder="Origen — se detecta automáticamente">
-        <input type="text" id="destino" class="campo" placeholder="Dirección de llegada">
+        <!-- Campos en la misma línea -->
+        <div class="fila-campos">
+            <input type="text" id="origen" class="campo" placeholder="Origen">
+            <input type="text" id="destino" class="campo" placeholder="Destino">
+        </div>
 
-        <button class="btn-azul" onclick="usarMiUbicacion()">📍 Mi ubicación</button>
-        <button class="btn-azul" onclick="calcularRuta()">🚌 Buscar rutas</button>
-        <button class="btn-verde" onclick="iniciarSeguimiento()">🔁 Seguimiento recorrido</button>
-        <button class="btn-gris" onclick="limpiarRecorrido()">🧹 Limpiar recorrido</button>
-        <button class="btn-rojo" onclick="detenerSeguimiento()" id="btnDetener" style="display:none;">⏹️ Detener seguimiento</button>
+        <!-- Botones más pequeños -->
+        <div class="fila-botones">
+            <button class="btn-azul" onclick="usarMiUbicacion()">📍 Mi ubicación</button>
+            <button class="btn-azul" onclick="calcularRuta()">🚌 Buscar rutas</button>
+            <button class="btn-verde" onclick="iniciarSeguimiento()">🔁 Seguimiento</button>
+            <button class="btn-gris" onclick="limpiarRecorrido()">🧹 Limpiar</button>
+            <button class="btn-rojo" onclick="detenerSeguimiento()" id="btnDetener" style="display:none;">⏹️ Detener</button>
+        </div>
 
         <div id="compartir-info">
-            <p>✅ Seguimiento activo. Actualización cada 3 segundos.</p>
-            <p>Enlace: <a id="enlaceUbicacion" href="#" target="_blank">Cargando...</a></p>
-            <button onclick="copiarEnlace()">📋 Copiar enlace</button>
+            <p>✅ Seguimiento activo | <a id="enlaceUbicacion" href="#" target="_blank">Ver ubicación</a> <button onclick="copiarEnlace()">Copiar</button></p>
         </div>
     </div>
 
     <!-- Mapa -->
     <div id="map"></div>
 
-    <!-- LISTA DE RUTAS AQUÍ DEBAJO DEL MAPA -->
+    <!-- Lista de rutas debajo del mapa -->
     <div class="seccion-rutas">
         <div class="titulo-seccion">Rutas disponibles:</div>
-        <div id="lista-rutas">Escribe el origen y destino, luego pulsa "Buscar rutas"</div>
+        <div id="lista-rutas">Escribe origen y destino, luego pulsa "Buscar rutas"</div>
     </div>
 
     <script>
@@ -172,7 +194,7 @@
         }
 
         function usarMiUbicacion() {
-            if (!navigator.geolocation) return alert("Geolocalización no soportada en tu navegador");
+            if (!navigator.geolocation) return alert("Geolocalización no soportada");
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
                     const ubicacion = { lat: pos.coords.latitude, lng: pos.coords.longitude };
@@ -191,14 +213,14 @@
                         if (res[0]) document.getElementById("origen").value = res[0].formatted_address;
                     });
                 },
-                () => alert("No se pudo obtener la ubicación. Revisa los permisos.")
+                () => alert("No se pudo obtener la ubicación")
             );
         }
 
         function calcularRuta() {
             const origen = document.getElementById("origen").value.trim();
             const destino = document.getElementById("destino").value.trim();
-            if (!origen || !destino) return alert("Completa ambos campos: origen y destino");
+            if (!origen || !destino) return alert("Completa ambos campos");
 
             limpiarRutaAnterior();
             respuestaCompleta = null;
@@ -217,10 +239,9 @@
 
             servicioDirecciones.route(solicitud, (respuesta, estado) => {
                 if (estado !== "OK") {
-                    document.getElementById("lista-rutas").innerHTML = "❌ No se encontraron rutas para este trayecto";
+                    document.getElementById("lista-rutas").innerHTML = "❌ No se encontraron rutas";
                     return;
                 }
-
                 respuestaCompleta = respuesta;
                 mostrarListaRutas();
             });
@@ -231,7 +252,6 @@
             elementosRuta = [];
         }
 
-        // ✅ Mostrar rutas en lista debajo del mapa
         function mostrarListaRutas() {
             const contenedor = document.getElementById("lista-rutas");
             contenedor.innerHTML = "";
@@ -308,9 +328,8 @@
             mapa.fitBounds(tramo.bounds);
         }
 
-        // Funciones de seguimiento
         function iniciarSeguimiento() {
-            if (!navigator.geolocation) return alert("Tu navegador no admite geolocalización");
+            if (!navigator.geolocation) return alert("No soportado");
             if (watchId) detenerSeguimiento();
 
             document.getElementById("compartir-info").style.display = "block";
@@ -339,7 +358,7 @@
                     document.getElementById("enlaceUbicacion").href = `https://www.google.com/maps?q=${lat},${lng}`;
                     document.getElementById("enlaceUbicacion").textContent = `${lat}, ${lng}`;
                 },
-                (err) => alert("Error al obtener ubicación: " + err.message),
+                (err) => alert("Error: " + err.message),
                 { enableHighAccuracy: true, maximumAge: 2000, timeout: 5000 }
             );
         }
@@ -356,10 +375,9 @@
         }
 
         function copiarEnlace() {
-            const enlace = document.getElementById("enlaceUbicacion").href;
-            navigator.clipboard.writeText(enlace)
-                .then(() => alert("Enlace copiado ✅"))
-                .catch(() => alert("No se pudo copiar el enlace"));
+            navigator.clipboard.writeText(document.getElementById("enlaceUbicacion").href)
+                .then(() => alert("Copiado ✅"))
+                .catch(() => alert("No se pudo copiar"));
         }
 
         window.onload = iniciarMapa;
