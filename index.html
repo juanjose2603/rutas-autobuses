@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rutas Transporte - Etiquetas Fijas</title>
+    <title>Rutas Transporte - Etiquetas Fijas en Inicio</title>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
@@ -69,7 +69,7 @@
         }
 
         /* --------------------------
-        MAPA Y RUTAS
+        MAPA
         -------------------------- */
         #map {
             width: 100%;
@@ -78,9 +78,9 @@
             flex-shrink: 0;
         }
 
-        /* Etiqueta fija para número de ruta */
+        /* ✅ Etiqueta fija para número de ruta */
         .etiqueta-ruta {
-            background: #fff;
+            background: #ffffff;
             border: 2px solid;
             border-radius: 50%;
             width: 32px;
@@ -91,7 +91,9 @@
             font-weight: bold;
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
             transform: translate(-50%, -50%);
-            white-space: nowrap;
+            position: absolute;
+            z-index: 1000;
+            pointer-events: none;
         }
 
         /* Colores distintivos por ruta */
@@ -194,22 +196,17 @@
         let elementosRuta = [];
         let etiquetasRuta = [];
 
-        // Colores únicos y fijos para cada ruta
-        const COLORES = [
-            "#1a73e8",   // Azul
-            "#34a853",   // Verde
-            "#fbbc05",   // Amarillo
-            "#ea4335"    // Rojo
-        ];
+        // Colores fijos por ruta
+        const COLORES = ["#1a73e8", "#34a853", "#fbbc05", "#ea4335"];
         const COLOR_PIE = "#909090";
         // ✅ Tramo a pie solo con línea punteada, sin flechas
         const ESTILO_PIE = {
             strokeOpacity: 0.8,
             strokeWeight: 3,
-            strokeDashArray: [5, 5] // Solo guiones
+            strokeDashArray: [5, 5]
         };
 
-        // Clase personalizada para etiquetas fijas en el mapa
+        // ✅ Clase para etiquetas FIJAS y permanentes en el mapa
         class EtiquetaRuta extends google.maps.OverlayView {
             constructor(posicion, numero, claseColor) {
                 super();
@@ -223,7 +220,7 @@
                 this.div.className = `etiqueta-ruta ${this.claseColor}`;
                 this.div.textContent = this.numero;
                 const panes = this.getPanes();
-                panes.overlayLayer.appendChild(this.div);
+                panes.overlayMouseTarget.appendChild(this.div);
             }
 
             draw() {
@@ -385,11 +382,12 @@
                 trazo.setMap(mapa);
                 elementosRuta.push(trazo);
 
-                // ✅ Etiqueta FIJA, sin ventana flotante, en el punto de inicio
+                // ✅ NÚMERO DE RUTA DE FORMA FIJA EN EL PUNTO DE INICIO
                 if (paso.travel_mode === "TRANSIT" && paso.transit) {
                     const numeroRuta = paso.transit.line.short_name || paso.transit.line.name || "";
                     if (!numeroRuta) return;
 
+                    // Tomamos EXACTAMENTE el punto inicial del recorrido
                     const puntoInicio = new google.maps.LatLng(
                         paso.start_location.lat(),
                         paso.start_location.lng()
