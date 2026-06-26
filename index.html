@@ -3,135 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rutas Transporte - Funcional</title>
+    <title>Rutas Transporte - Versión Definitiva</title>
+    <!-- ⚠️ PON AQUÍ TU CLAVE REAL DE GOOGLE -->
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
         html, body { height: 100%; overflow: hidden; display: flex; flex-direction: column; }
 
-        /* Panel superior */
-        .panel-superior {
-            padding: 8px 10px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #ddd;
-            flex-shrink: 0;
-        }
-        .campo {
-            width: 100%;
-            padding: 9px 10px;
-            margin: 6px 0;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 15px;
-        }
-        .fila-botones {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin: 8px 0;
-        }
-        button {
-            padding: 8px 12px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 500;
-            font-size: 13px;
-            flex: 1;
-            min-width: 80px;
-        }
+        .panel-superior { padding: 8px 10px; background: #f8f9fa; border-bottom: 1px solid #ddd; flex-shrink: 0; }
+        .campo { width: 100%; padding: 9px 10px; margin: 6px 0; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; }
+        .fila-botones { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+        button { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; font-size: 13px; flex: 1; min-width: 80px; }
         .btn-azul { background: #1a73e8; color: white; }
         .btn-verde { background: #34a853; color: white; }
         .btn-rojo { background: #ea4335; color: white; }
         .btn-gris { background: #70757a; color: white; }
 
-        /* Info compartir ubicación */
-        #compartir-info {
-            padding: 6px 10px;
-            background: #e8f0fe;
-            border-radius: 4px;
-            display: none;
-            font-size: 12px;
-            margin-top: 6px;
-        }
-        #compartir-info button {
-            padding: 4px 8px;
-            font-size: 11px;
-            flex: none;
-        }
+        #compartir-info { padding: 6px 10px; background: #e8f0fe; border-radius: 4px; display: none; font-size: 12px; margin-top: 6px; }
+        #map { width: 100%; height: 45vh; border-bottom: 1px solid #ddd; flex-shrink: 0; }
 
-        /* Mapa */
-        #map {
-            width: 100%;
-            height: 45vh;
-            border-bottom: 1px solid #ddd;
-            flex-shrink: 0;
-        }
-
-        /* Etiquetas */
-        .etiqueta-rectangulo {
-            background: #ffffff;
-            border: 2px solid #1a73e8;
-            border-radius: 4px;
-            padding: 4px 9px;
-            font-size: 12px;
-            font-weight: 500;
-            color: #222;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-            transform: translate(-50%, -100%);
-            position: absolute;
-            white-space: nowrap;
-            z-index: 999;
-            pointer-events: none;
-        }
-        .etiqueta-ruta {
-            background: #ffffff;
-            border: 2px solid;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            line-height: 26px;
-            text-align: center;
-            font-size: 12px;
-            font-weight: bold;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-            transform: translate(-50%, -50%);
-            position: absolute;
-            z-index: 1000;
-            pointer-events: none;
-        }
+        .etiqueta-rectangulo { background: #fff; border: 2px solid #1a73e8; border-radius: 4px; padding: 4px 9px; font-size: 12px; font-weight: 500; color: #222; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transform: translate(-50%, -100%); position: absolute; white-space: nowrap; z-index: 999; pointer-events: none; }
+        .etiqueta-ruta { background: #fff; border: 2px solid; border-radius: 50%; width: 30px; height: 30px; line-height: 26px; text-align: center; font-size: 12px; font-weight: bold; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transform: translate(-50%, -50%); position: absolute; z-index: 1000; pointer-events: none; }
         .color-ruta-1 { border-color: #1a73e8; color: #1a73e8; }
         .color-ruta-2 { border-color: #34a853; color: #34a853; }
         .color-ruta-3 { border-color: #fbbc05; color: #fbbc05; }
         .color-ruta-4 { border-color: #ea4335; color: #ea4335; }
 
-        /* Rutas */
-        .seccion-rutas {
-            padding: 10px;
-            background: #fff;
-            overflow-y: auto;
-            flex: 1;
-        }
-        .titulo-seccion {
-            font-size: 16px;
-            font-weight: bold;
-            margin-bottom: 10px;
-            color: #333;
-        }
-        .ruta-item {
-            border: 1px solid #eee;
-            border-radius: 6px;
-            padding: 12px;
-            margin-bottom: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .ruta-item.activa {
-            background: #e8f0fe;
-            border-color: #1a73e8;
-        }
+        .seccion-rutas { padding: 10px; background: #fff; overflow-y: auto; flex: 1; }
+        .titulo-seccion { font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #333; }
+        .ruta-item { border: 1px solid #eee; border-radius: 6px; padding: 12px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s; }
+        .ruta-item.activa { background: #e8f0fe; border-color: #1a73e8; }
+        .error { color: #d32f2f; font-weight: bold; padding: 10px; background: #ffebee; border-radius: 4px; }
 
-        /* Móvil */
         @media (max-width: 480px) {
             #map { height: 40vh; }
             .etiqueta-rectangulo { font-size: 11px; padding: 3px 7px; }
@@ -167,9 +70,8 @@
         let respuestaCompleta, elementos = [], puntosRecorrido = [];
         let miUbicacionActual = null;
 
-        // ✅ Ruta a pie: ROJA punteada
         const COLORES = ["#1a73e8", "#34a853", "#fbbc05", "#ea4335"];
-        const COLOR_PIE = "#d32f2f";
+        const COLOR_PIE = "#d32f2f"; // Rojo punteado
         const ESTILO_PIE = { strokeOpacity: 0.9, strokeWeight: 3, strokeDashArray: [6, 4] };
 
         class Etiqueta extends google.maps.OverlayView {
@@ -190,7 +92,7 @@
 
         function iniciarMapa() {
             mapa = new google.maps.Map(document.getElementById("map"), {
-                center: { lat: -12.0464, lng: -77.0428 }, // Lima, Perú (cambia si estás en otro país)
+                center: { lat: -12.0464, lng: -77.0428 }, // Lima, Perú
                 zoom: 12,
                 gestureHandling: "greedy"
             });
@@ -233,7 +135,7 @@
             if (miUbicacionActual) mostrarEtiquetaEstoyAqui();
         }
 
-        // ✅ FUNCIÓN CORREGIDA PARA QUE SÍ DEVUELVA RUTAS
+        // ✅ FUNCIÓN CON MENSAJE DE ERROR VISIBLE
         function calcularRuta() {
             const origen = document.getElementById("origen").value.trim();
             const destino = document.getElementById("destino").value.trim();
@@ -245,23 +147,28 @@
             servicioDirecciones.route({
                 origin: origen,
                 destination: destino,
-                travelMode: google.maps.TravelMode.TRANSIT,
-                transitOptions: {
-                    modes: ["BUS", "SUBWAY", "TRAIN"],
-                    routingPreference: google.maps.TransitRoutingPreference.FEWER_TRANSFERS
-                },
+                travelMode: "TRANSIT",
+                transitOptions: { modes: ["BUS", "SUBWAY", "TRAIN"], routingPreference: "FEWER_TRANSFERS" },
                 provideRouteAlternatives: true,
                 language: "es",
-                region: "PE", // ⚠️ CAMBIA A TU PAÍS: MX = México, CL = Chile, AR = Argentina, ES = España
+                region: "PE", // Cambia a tu país: MX, CO, CL, AR, ES
                 unitSystem: google.maps.UnitSystem.METRIC,
-                suppressMarkers: true // Quita marcadores azules/rojos automáticos
+                suppressMarkers: true
             }, (respuesta, estado) => {
-                console.log("Estado:", estado); // Para ver errores en consola
+                console.log("Respuesta:", estado);
                 if (estado === "OK") {
                     respuestaCompleta = respuesta;
                     mostrarRutas();
                 } else {
-                    document.getElementById("lista-rutas").innerHTML = `❌ Error: ${estado} | Verifica tu clave API y permisos`;
+                    let mensaje = "";
+                    switch(estado) {
+                        case "REQUEST_DENIED": mensaje = "❌ CLAVE API INVÁLIDA o APIs no habilitadas"; break;
+                        case "ZERO_RESULTS": mensaje = "❌ No hay rutas de transporte público entre esos puntos"; break;
+                        case "OVER_QUERY_LIMIT": mensaje = "❌ Límite de consultas agotado en tu clave"; break;
+                        case "NOT_FOUND": mensaje = "❌ No se encontró origen o destino"; break;
+                        default: mensaje = `❌ Error: ${estado}`;
+                    }
+                    document.getElementById("lista-rutas").innerHTML = `<div class="error">${mensaje}</div>`;
                 }
             });
         }
