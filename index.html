@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rutas Transporte - Funcional</title>
+    <title>Rutas Transporte - Ubicación Correcta</title>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
@@ -165,6 +165,7 @@
     <script>
         let mapa, servicioDirecciones, marcadorUbicacion, watchId = null, lineaRecorrido = null;
         let respuestaCompleta, elementos = [], puntosRecorrido = [];
+        let miUbicacionActual = null; // Guardamos tu posición real
         const COLORES = ["#1a73e8", "#34a853", "#fbbc05", "#ea4335"];
         const COLOR_PIE = "#ea4335"; // Ruta a pie en rojo punteado
         const ESTILO_PIE = { strokeOpacity: 0.8, strokeWeight: 3, strokeDashArray: [5, 5] };
@@ -187,35 +188,51 @@
 
         function iniciarMapa() {
             mapa = new google.maps.Map(document.getElementById("map"), {
-                center: { lat: -12.0464, lng: -77.0428 }, // Lima, Perú
+                center: { lat: -12.0464, lng: -77.0428 },
                 zoom: 12,
                 gestureHandling: "greedy"
             });
             servicioDirecciones = new google.maps.DirectionsService();
             new google.maps.places.Autocomplete(document.getElementById("origen"));
             new google.maps.places.Autocomplete(document.getElementById("destino"));
-            usarMiUbicacion(); // Intenta cargar ubicación al inicio
+            usarMiUbicacion(); // Carga ubicación al inicio
         }
 
         function usarMiUbicacion() {
             if (!navigator.geolocation) { alert("Geolocalización no soportada"); return; }
             navigator.geolocation.getCurrentPosition(
                 pos => {
-                    const ubic = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                    mapa.setCenter(ubic);
+                    miUbicacionActual = new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
+                    mapa.setCenter(miUbicacionActual);
                     if (!marcadorUbicacion) {
                         marcadorUbicacion = new google.maps.Marker({
-                            position: ubic, map: mapa, title: "Mi ubicación",
+                            position: miUbicacionActual, map: mapa, title: "Mi ubicación",
                             icon: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png"
                         });
-                    } else marcadorUbicacion.setPosition(ubic);
-                    new google.maps.Geocoder().geocode({ location: ubic }, res => {
+                    } else marcadorUbicacion.setPosition(miUbicacionActual);
+                    new google.maps.Geocoder().geocode({ location: miUbicacionActual }, res => {
                         if (res[0]) document.getElementById("origen").value = res[0].formatted_address;
                     });
+                    // ✅ Mostrar "Estoy aquí" en tu ubicación real
+                    mostrarEtiquetaEstoyAqui();
                 },
                 err => alert("Permite la ubicación en tu navegador/configuración"),
                 { enableHighAccuracy: true, maximumAge: 10000, timeout: 8000 }
             );
+        }
+
+        function mostrarEtiquetaEstoyAqui() {
+            // Eliminamos etiqueta anterior si existe
+            elementos = elementos.filter(el => {
+                if (el.contenido === "Estoy aquí") { el.setMap(null); return false; }
+                return true;
+            });
+            if (miUbicacionActual) {
+                const etiqueta = new Etiqueta(miUbicacionActual, "Estoy aquí", "etiqueta-rectangulo");
+                etiqueta.setMap(mapa);
+                etiqueta.contenido = "Estoy aquí";
+                elementos.push(etiqueta);
+            }
         }
 
         function limpiarTodo() {
@@ -223,6 +240,8 @@
             elementos = [];
             puntosRecorrido = [];
             if (lineaRecorrido) lineaRecorrido.setPath([]);
+            // Volvemos a mostrar "Estoy aquí" después de limpiar
+            if (miUbicacionActual) mostrarEtiquetaEstoyAqui();
         }
 
         function calcularRuta() {
@@ -259,7 +278,8 @@
         }
 
         function dibujarRuta(indice) {
-            limpiarTodo();
+            // Limpiamos solo rutas, mantenemos "Estoy aquí"
+            elementos = elementos.filter(el => el.contenido === "Estoy aquí");
             document.querySelectorAll(".ruta-item").forEach(el => el.classList.remove("activa"));
             const rutaActiva = document.querySelectorAll(".ruta-item")[indice];
             if (rutaActiva) rutaActiva.classList.add("activa");
@@ -267,8 +287,6 @@
             const ruta = respuestaCompleta.routes[indice];
             const tramo = ruta.legs[0];
             const colorRuta = COLORES[indice];
-
-            elementos.push(new Etiqueta(tramo.start_location, "Estoy aquí", "etiqueta-rectangulo").setMap(mapa));
 
             tramo.steps.forEach(paso => {
                 if (!paso || !paso.path) return;
@@ -282,11 +300,19 @@
                 elementos.push(linea);
                 if (esTransporte && paso.transit) {
                     const num = paso.transit.line.short_name || paso.transit.line.name;
-                    if (num) elementos.push(new Etiqueta(paso.start_location, num, `etiqueta-ruta color-ruta-${indice+1}`).setMap(mapa));
+                    if (num) {
+                        const etiquetaRuta = new Etiqueta(paso.start_location, num, `etiqueta-ruta color-ruta-${indice+1}`);
+                        etiquetaRuta.setMap(mapa);
+                        elementos.push(etiquetaRuta);
+                    }
                 }
             });
 
-            elementos.push(new Etiqueta(tramo.end_location, "Destino", "etiqueta-rectangulo").setMap(mapa));
+            // ✅ "Destino" en el punto final de la ruta
+            const etiquetaDestino = new Etiqueta(tramo.end_location, "Destino", "etiqueta-rectangulo");
+            etiquetaDestino.setMap(mapa);
+            elementos.push(etiquetaDestino);
+
             mapa.fitBounds(tramo.bounds);
         }
 
@@ -301,12 +327,14 @@
             lineaRecorrido.setMap(mapa);
             watchId = navigator.geolocation.watchPosition(
                 pos => {
+                    miUbicacionActual = new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
                     const lat = pos.coords.latitude.toFixed(6), lng = pos.coords.longitude.toFixed(6);
                     const ubic = { lat: +lat, lng: +lng };
                     puntosRecorrido.push(ubic);
                     lineaRecorrido.setPath(puntosRecorrido);
-                    if (marcadorUbicacion) marcadorUbicacion.setPosition(ubic);
-                    mapa.setCenter(ubic);
+                    if (marcadorUbicacion) marcadorUbicacion.setPosition(miUbicacionActual);
+                    mapa.setCenter(miUbicacionActual);
+                    mostrarEtiquetaEstoyAqui(); // Actualiza la etiqueta en movimiento
                     document.getElementById("enlaceUbicacion").href = `https://www.google.com/maps?q=${lat},${lng}`;
                     document.getElementById("enlaceUbicacion").textContent = `${lat}, ${lng}`;
                 },
