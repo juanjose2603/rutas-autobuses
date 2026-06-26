@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rutas Transporte - Ubicación Correcta</title>
+    <title>Rutas Transporte - Ajustes Finales</title>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
@@ -165,10 +165,16 @@
     <script>
         let mapa, servicioDirecciones, marcadorUbicacion, watchId = null, lineaRecorrido = null;
         let respuestaCompleta, elementos = [], puntosRecorrido = [];
-        let miUbicacionActual = null; // Guardamos tu posición real
+        let miUbicacionActual = null;
+
+        // ✅ Ruta a pie: ROJO intenso y punteada
         const COLORES = ["#1a73e8", "#34a853", "#fbbc05", "#ea4335"];
-        const COLOR_PIE = "#ea4335"; // Ruta a pie en rojo punteado
-        const ESTILO_PIE = { strokeOpacity: 0.8, strokeWeight: 3, strokeDashArray: [5, 5] };
+        const COLOR_PIE = "#d32f2f"; // Rojo más intenso
+        const ESTILO_PIE = {
+            strokeOpacity: 0.9,
+            strokeWeight: 3,
+            strokeDashArray: [6, 4] // Más marcado el punteado
+        };
 
         class Etiqueta extends google.maps.OverlayView {
             constructor(pos, contenido, clase) { super(); this.pos = pos; this.contenido = contenido; this.clase = clase; }
@@ -190,12 +196,13 @@
             mapa = new google.maps.Map(document.getElementById("map"), {
                 center: { lat: -12.0464, lng: -77.0428 },
                 zoom: 12,
-                gestureHandling: "greedy"
+                gestureHandling: "greedy",
+                disableDefaultUI: false
             });
             servicioDirecciones = new google.maps.DirectionsService();
             new google.maps.places.Autocomplete(document.getElementById("origen"));
             new google.maps.places.Autocomplete(document.getElementById("destino"));
-            usarMiUbicacion(); // Carga ubicación al inicio
+            usarMiUbicacion();
         }
 
         function usarMiUbicacion() {
@@ -204,16 +211,14 @@
                 pos => {
                     miUbicacionActual = new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
                     mapa.setCenter(miUbicacionActual);
-                    if (!marcadorUbicacion) {
-                        marcadorUbicacion = new google.maps.Marker({
-                            position: miUbicacionActual, map: mapa, title: "Mi ubicación",
-                            icon: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png"
-                        });
-                    } else marcadorUbicacion.setPosition(miUbicacionActual);
+                    // ✅ Eliminamos el marcador azul por defecto, solo dejamos la etiqueta
+                    if (marcadorUbicacion) {
+                        marcadorUbicacion.setMap(null);
+                        marcadorUbicacion = null;
+                    }
                     new google.maps.Geocoder().geocode({ location: miUbicacionActual }, res => {
                         if (res[0]) document.getElementById("origen").value = res[0].formatted_address;
                     });
-                    // ✅ Mostrar "Estoy aquí" en tu ubicación real
                     mostrarEtiquetaEstoyAqui();
                 },
                 err => alert("Permite la ubicación en tu navegador/configuración"),
@@ -222,7 +227,6 @@
         }
 
         function mostrarEtiquetaEstoyAqui() {
-            // Eliminamos etiqueta anterior si existe
             elementos = elementos.filter(el => {
                 if (el.contenido === "Estoy aquí") { el.setMap(null); return false; }
                 return true;
@@ -240,7 +244,6 @@
             elementos = [];
             puntosRecorrido = [];
             if (lineaRecorrido) lineaRecorrido.setPath([]);
-            // Volvemos a mostrar "Estoy aquí" después de limpiar
             if (miUbicacionActual) mostrarEtiquetaEstoyAqui();
         }
 
@@ -251,8 +254,14 @@
             limpiarTodo();
             document.getElementById("lista-rutas").innerHTML = "🔄 Buscando rutas...";
             servicioDirecciones.route({
-                origin: origen, destination: destino, travelMode: "TRANSIT",
-                provideRouteAlternatives: true, language: "es", region: "PE"
+                origin: origen,
+                destination: destino,
+                travelMode: "TRANSIT",
+                provideRouteAlternatives: true,
+                language: "es",
+                region: "PE",
+                // ✅ Quitamos los marcadores de inicio y fin de la ruta calculada
+                suppressMarkers: true
             }, (res, estado) => {
                 if (estado !== "OK") {
                     document.getElementById("lista-rutas").innerHTML = "❌ No se encontraron rutas";
@@ -278,7 +287,6 @@
         }
 
         function dibujarRuta(indice) {
-            // Limpiamos solo rutas, mantenemos "Estoy aquí"
             elementos = elementos.filter(el => el.contenido === "Estoy aquí");
             document.querySelectorAll(".ruta-item").forEach(el => el.classList.remove("activa"));
             const rutaActiva = document.querySelectorAll(".ruta-item")[indice];
@@ -291,13 +299,18 @@
             tramo.steps.forEach(paso => {
                 if (!paso || !paso.path) return;
                 const esTransporte = paso.travel_mode === "TRANSIT";
+
+                // ✅ Línea a pie: roja y punteada
                 const linea = new google.maps.Polyline({
-                    path: paso.path, strokeColor: esTransporte ? colorRuta : COLOR_PIE,
-                    strokeWeight: esTransporte ? 7 : 3, strokeOpacity: 0.9,
+                    path: paso.path,
+                    strokeColor: esTransporte ? colorRuta : COLOR_PIE,
+                    strokeWeight: esTransporte ? 7 : 3,
+                    strokeOpacity: esTransporte ? 0.95 : ESTILO_PIE.strokeOpacity,
                     strokeDashArray: esTransporte ? [] : ESTILO_PIE.strokeDashArray
                 });
                 linea.setMap(mapa);
                 elementos.push(linea);
+
                 if (esTransporte && paso.transit) {
                     const num = paso.transit.line.short_name || paso.transit.line.name;
                     if (num) {
@@ -308,7 +321,7 @@
                 }
             });
 
-            // ✅ "Destino" en el punto final de la ruta
+            // ✅ Solo etiqueta "Destino", sin marcador
             const etiquetaDestino = new Etiqueta(tramo.end_location, "Destino", "etiqueta-rectangulo");
             etiquetaDestino.setMap(mapa);
             elementos.push(etiquetaDestino);
@@ -316,7 +329,6 @@
             mapa.fitBounds(tramo.bounds);
         }
 
-        // Compartir ubicación en tiempo real
         function iniciarSeguimiento() {
             if (!navigator.geolocation) return alert("Geolocalización no soportada");
             if (watchId) detenerSeguimiento();
@@ -332,9 +344,8 @@
                     const ubic = { lat: +lat, lng: +lng };
                     puntosRecorrido.push(ubic);
                     lineaRecorrido.setPath(puntosRecorrido);
-                    if (marcadorUbicacion) marcadorUbicacion.setPosition(miUbicacionActual);
                     mapa.setCenter(miUbicacionActual);
-                    mostrarEtiquetaEstoyAqui(); // Actualiza la etiqueta en movimiento
+                    mostrarEtiquetaEstoyAqui();
                     document.getElementById("enlaceUbicacion").href = `https://www.google.com/maps?q=${lat},${lng}`;
                     document.getElementById("enlaceUbicacion").textContent = `${lat}, ${lng}`;
                 },
