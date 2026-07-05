@@ -2,152 +2,111 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Rutas Transporte Lima — Tiempo Estimado</title>
+<meta name="viewport" content="width=device-width, initial‑scale=1.0, maximum‑scale=1.0">
+<title>Rutas Lima • Más directas</title>
 <style>
-  * {box-sizing:border-box; font-family:Arial,sans-serif; margin:0; padding:0;}
-  body{background:#f0f4f8; padding:15px;}
-  .contenedor{max-width:1000px; margin:0 auto; background:white; border-radius:12px; padding:20px; box-shadow:0 4px 12px rgba(0,0,0,0.1);}
-  h2{color:#1a73e8; margin-bottom:15px; text-align:center;}
-  .barra-entrada{display:flex; flex-wrap:wrap; gap:10px; margin-bottom:15px; align-items:center;}
-  input, button{padding:12px; border:1px solid #dadce0; border-radius:8px; font-size:15px; flex:1; min-width:220px;}
-  button{flex:initial; background:#1a73e8; color:white; border:none; cursor:pointer; font-weight:500; transition:background 0.2s;}
-  button:hover{background:#0d59c2;}
-  #mapa{width:100%; height:520px; border-radius:8px; margin:15px 0; border:1px solid #e0e0e0;}
-  .titulo-resultados{font-size:17px; font-weight:600; color:#333; margin:10px 0;}
-  .ruta{background:#f8faff; border-left:4px solid #1a73e8; padding:14px; margin-bottom:10px; border-radius:0 6px 6px 0;}
-  .ruta-tiempo{font-size:16px; font-weight:bold; color:#d93025; margin-bottom:5px;}
-  .ruta-distancia{color:#5f6368; margin-bottom:8px;}
-  .pasos{font-size:14px; line-height:1.6; color:#3c4043;}
-  .etiqueta-tipo{display:inline-block; padding:3px 8px; border-radius:4px; font-size:12px; margin-right:5px; color:white;}
-  .bus{background:#34a853;} .metro{background:#fbbc05; color:#333;} .corredor{background:#ea4335;} .caminar{background:#9aa0a6;}
+*{box-sizing:border-box;font-family:Arial,sans-serif;margin:0;padding:0;}
+body{background:#f0f4f8;padding:10px;}
+.contenedor{max-width:980px;margin:auto;background:#fff;border-radius:10px;padding:12px;box-shadow:0 3px 10px #0002;}
+h2{color:#1a73e8;text-align:center;margin-bottom:12px;font-size:19px;}
+.barra{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center;}
+input,button{padding:10px;border-radius:7px;border:1px solid #ccc;font-size:15px;flex:1;min-width:190px;}
+button{flex:initial;background:#1a73e8;color:#fff;border:none;cursor:pointer;font-weight:500;}
+button:hover{background:#0d59c2;}
+#mapa{width:100%;height:min(480px,62vh);border-radius:8px;margin:10px 0;}
+.info-titulo{font-weight:600;color:#333;margin:8px 0;}
+.ruta{background:#f8faff;border-left:4px solid #2e7d32;padding:10px;margin-bottom:8px;border-radius:0 6px 6px 0;}
+.datos{font-weight:bold;color:#1b5e20;}
+.etq{display:inline-block;font-size:12px;padding:2px 6px;border-radius:4px;color:#fff;margin-right:4px;}
+.bus{background:#34a853;} .metro{background:#f9a825;color:#222;} .corredor{background:#ea4335;} .caminar{background:#9aa0a6;}
+.pasos{font-size:14px;line-height:1.5;margin-top:4px;color:#333;}
+@media (max-width:480px){input,button{font-size:14px;padding:9px;} h2{font-size:17px;}}
 </style>
 
-<!-- ↓↓↓ REEMPLAZA ESTO CON TU CLAVE API ↓↓↓ -->
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places,geometry"></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places"></script>
 </head>
 <body>
-
 <div class="contenedor">
-  <h2>🚌 Rutas de Transporte Público en Lima</h2>
-  
-  <div class="barra-entrada">
-    <button onclick="obtenerUbicacion()">📍 Mi ubicación</button>
-    <input type="text" id="origen" placeholder="Dirección de inicio" autocomplete="off">
-    <input type="text" id="destino" placeholder="Dirección de destino" autocomplete="off">
-    <button onclick="calcularRutas()">🔍 Ver rutas</button>
+  <h2>🚌 Rutas • Más directas y menos transbordos</h2>
+  <div class="barra">
+    <button onclick="miUbic()">📍 Mi ubicación</button>
+    <input id="origen" placeholder="Dirección o lugar de inicio">
+    <input id="destino" placeholder="Dirección o lugar final">
+    <button onclick="calcular()">🔍 Calcular</button>
   </div>
-
   <div id="mapa"></div>
-
-  <div class="titulo-resultados">📋 Opciones de viaje:</div>
-  <div id="lista-rutas"></div>
+  <div class="info-titulo">📋 Mejores rutas ordenadas: <b>menos cambios primero</b></div>
+  <div id="lista"></div>
 </div>
 
 <script>
-let mapa, servicioDirecciones, visualizador;
+let mapa, dirServ, dirVis;
 
-// Inicializar mapa centrado en Lima
-function iniciarMapa() {
-  mapa = new google.maps.Map(document.getElementById("mapa"), {
-    center: {lat: -12.0464, lng: -77.0428},
-    zoom: 12,
-    mapTypeControl: true,
-    fullscreenControl: true
-  });
-  servicioDirecciones = new google.maps.DirectionsService();
-  visualizador = new google.maps.DirectionsRenderer({
-    suppressPolylines: false,
-    draggable: false
-  });
-  visualizador.setMap(mapa);
+function iniciar(){
+  mapa=new google.maps.Map(document.getElementById("mapa"),{center:{lat:-12.0464,lng:-77.0428},zoom:12,fullscreenControl:true});
+  dirServ=new google.maps.DirectionsService();
+  dirVis=new google.maps.DirectionsRenderer({preserveViewport:true});
+  dirVis.setMap(mapa);
 }
 
-// Obtener ubicación automática
-function obtenerUbicacion() {
-  if (!navigator.geolocation) {
-    alert("❌ Tu navegador no admite ubicación");
-    return;
-  }
-  navigator.geolocation.getCurrentPosition(
-    (posicion) => {
-      const lat = posicion.coords.latitude;
-      const lng = posicion.coords.longitude;
-      document.getElementById("origen").value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-      mapa.setCenter({lat, lng});
-      mapa.setZoom(15);
-    },
-    (error) => {
-      alert("⚠️ No se pudo obtener la ubicación: " + error.message);
-    },
-    {enableHighAccuracy: true}
-  );
+function miUbic(){
+  if(!navigator.geolocation) return alert("No hay ubicación");
+  navigator.geolocation.getCurrentPosition(p=>{
+    const ll={lat:p.coords.latitude,lng:p.coords.longitude};
+    document.getElementById("origen").value=ll.lat.toFixed(5)+", "+ll.lng.toFixed(5);
+    mapa.setCenter(ll);mapa.setZoom(15);
+  },e=>alert("No se pudo ubicar"),{enableHighAccuracy:true});
 }
 
-// Calcular y mostrar todas las rutas
-function calcularRutas() {
-  const origen = document.getElementById("origen").value.trim();
-  const destino = document.getElementById("destino").value.trim();
-  const lista = document.getElementById("lista-rutas");
-  lista.innerHTML = "<p>Buscando rutas...</p>";
+function calcular(){
+  const o=document.getElementById("origen").value.trim(),d=document.getElementById("destino").value.trim(),L=document.getElementById("lista");
+  L.innerHTML="<em>Buscando rutas más directas…</em>";
+  if(!o||!d) return alert("Completa ambos puntos");
 
-  if (!origen || !destino) {
-    alert("⚠️ Escribe origen y destino");
-    return;
-  }
-
-  const solicitud = {
-    origin: origen,
-    destination: destino,
-    travelMode: google.maps.TravelMode.TRANSIT, // Solo transporte público
-    provideRouteAlternatives: true, // Mostrar todas las opciones
-    transitOptions: {
-      modes: ["BUS", "RAIL", "SUBWAY", "TRAM"] // Incluye todos los tipos
+  const req={
+    origin:o,destination:d,
+    travelMode:"TRANSIT",
+    provideRouteAlternatives:true,
+    transitOptions:{
+      modes:["BUS","RAIL"],
+      routingPreference:"LESS_TRANSFERS" // ✅ CLAVE: PRIORIZA MENOS CAMBIOS
     },
-    unitSystem: google.maps.UnitSystem.METRIC,
-    language: "es"
+    unitSystem:"METRIC",language:"es"
   };
 
-  servicioDirecciones.route(solicitud, (respuesta, estado) => {
-    lista.innerHTML = "";
-    if (estado !== google.maps.DirectionsStatus.OK) {
-      lista.innerHTML = `<p style="color:red;">❌ No se encontraron rutas: ${estado}</p>`;
-      return;
-    }
+  dirServ.route(req,(res,est)=>{
+    L.innerHTML="";
+    if(est!=="OK") return L.innerHTML="<span style='color:red'>❌ Sin rutas: "+est+"</span>";
+    dirVis.setDirections(res);
 
-    visualizador.setDirections(respuesta);
+    // Ordena rutas: primero las que tienen menos transbordos
+    const ordenadas=res.routes.slice().sort((a,b)=>{
+      const ta=a.legs[0].steps.filter(s=>s.travelMode==="TRANSIT").length;
+      const tb=b.legs[0].steps.filter(s=>s.travelMode==="TRANSIT").length;
+      return ta‑tb;
+    });
 
-    respuesta.routes.forEach((ruta, indice) => {
-      const tramo = ruta.legs[0];
-      const tarjeta = document.createElement("div");
-      tarjeta.className = "ruta";
-
-      // Formatear pasos con etiquetas
-      let pasosTexto = "";
-      tramo.steps.forEach(paso => {
-        let etiqueta = "";
-        if (paso.travelMode === "WALKING") etiqueta = `<span class="etiqueta-tipo caminar">Caminar</span>`;
-        else if (paso.travelMode === "TRANSIT") {
-          const tipo = paso.transit.line.vehicle.type;
-          if (tipo === "BUS") etiqueta = `<span class="etiqueta-tipo bus">Bus</span>`;
-          else if (tipo === "METRO_RAIL" || tipo === "SUBWAY") etiqueta = `<span class="etiqueta-tipo metro">Metro/Metropolitano</span>`;
-          else etiqueta = `<span class="etiqueta-tipo corredor">Corredor</span>`;
+    ordenadas.forEach((r,i)=>{
+      const tr=r.legs[0],div=document.createElement("div");
+      div.className="ruta";
+      let txt="";
+      tr.steps.forEach(p=>{
+        let et="";
+        if(p.travelMode==="WALKING") et='<span class="etq caminar">Caminar</span>';
+        else if(p.travelMode==="TRANSIT"){
+          const t=p.transit.line.vehicle.type;
+          if(t==="BUS") et='<span class="etq bus">Bus</span>';
+          else if(/RAIL|SUBWAY/.test(t)) et='<span class="etq metro">Metro/Metropolitano</span>';
+          else et='<span class="etq corredor">Corredor</span>';
         }
-        pasosTexto += `${etiqueta} ${paso.instructions.replace(/<[^>]*>/g, "")} (${paso.distance.text})<br>`;
+        txt+=et+p.instructions.replace(/<[^>]+>/g,"")+" ("+p.distance.text+")<br>";
       });
-
-      tarjeta.innerHTML = `
-        <div class="ruta-tiempo">Ruta ${indice + 1} → Tiempo estimado: ${tramo.duration.text}</div>
-        <div class="ruta-distancia">Distancia total: ${tramo.distance.text}</div>
-        <div class="pasos">${pasosTexto}</div>
-      `;
-      lista.appendChild(tarjeta);
+      div.innerHTML=`<div class="datos">Ruta ${i+1} • ⏱️ ${tr.duration.text} • 📏 ${tr.distance.text}</div><div class="pasos">${txt}</div>`;
+      L.appendChild(div);
     });
   });
 }
-
-// Cargar mapa al abrir la página
-window.onload = iniciarMapa;
+google.maps.event.addDomListener(window,"load",iniciar);
 </script>
 </body>
 </html>
