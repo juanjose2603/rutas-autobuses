@@ -81,11 +81,11 @@
     </div>
 
     <script>
-        // 👇 COLOCA TU CLAVE API AQUÍ 👇
+        // 👇 PON TU CLAVE API AQUÍ 👇
         const CLAVE_API = 'AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA';
 
         let mapa, servicioRutas, renderizadorRuta;
-        let todasLasRutas = [];
+        let respuestaCompleta = null; // Guardamos toda la respuesta sin modificar
 
         function initMap() {
             const lima = { lat: -12.0464, lng: -77.0428 };
@@ -95,7 +95,11 @@
             });
 
             servicioRutas = new google.maps.DirectionsService();
-            renderizadorRuta = new google.maps.DirectionsRenderer({ map: mapa, suppressMarkers: false });
+            renderizadorRuta = new google.maps.DirectionsRenderer({
+                map: mapa,
+                suppressMarkers: false,
+                polylineOptions: { strokeWeight: 5 }
+            });
 
             new google.maps.places.Autocomplete(document.getElementById('origen'), { componentRestrictions: { country: 'pe' } });
             new google.maps.places.Autocomplete(document.getElementById('destino'), { componentRestrictions: { country: 'pe' } });
@@ -136,10 +140,10 @@
                 region: 'pe', transitOptions: { routingPreference: 'FEWER_TRANSFERS' }
             }, (resp, estado) => {
                 if (estado === 'OK') {
-                    todasLasRutas = resp.routes;
-                    renderizadorRuta.setDirections(resp);
-                    mostrarResultados(resp);
-                    mostrarMensaje(`Listo: ${resp.routes.length} opciones. Haz clic en una para verla sola en el mapa`, 'exito');
+                    respuestaCompleta = resp; // Guardamos respuesta completa
+                    renderizadorRuta.setDirections(respuestaCompleta);
+                    mostrarResultados(respuestaCompleta);
+                    mostrarMensaje(`Listo: ${respuestaCompleta.routes.length} opciones. Haz clic en una para verla en el mapa`, 'exito');
                 } else {
                     mostrarMensaje(`Error: ${estado}`, 'error');
                     document.getElementById('resultados').innerHTML = `<p style="color:red;text-align:center;">No se encontraron rutas</p>`;
@@ -152,20 +156,30 @@
             let html = '';
             resp.routes.forEach((ruta, i) => {
                 const tiempo = ruta.legs[0].duration.text;
+                const distancia = ruta.legs[0].distance.text;
                 const transbordos = ruta.legs[0].steps.filter(p => p.travel_mode === 'TRANSIT').length - 1;
+
                 html += `<div class="ruta" onclick="verRuta(${i})" id="ruta-${i}">
                     <div class="tiempo">Opción ${i+1}: ${tiempo}</div>
-                    ${transbordos > 0 ? `<div class="transbordo">⚠️ ${transbordos} transbordos</div>` : `<div style="color:#34a853;">✅ Sin transbordos</div>`}
-                </div>`;
+                    <div class="distancia">Distancia: ${distancia}</div>`;
+                html += transbordos > 0 ? `<div class="transbordo">⚠️ ${transbordos} transbordos</div>` : `<div style="color:#34a853;">✅ Sin transbordos</div>`;
+                html += `</div>`;
             });
             caja.innerHTML = html;
+            // Seleccionar primera ruta por defecto
             document.getElementById('ruta-0').classList.add('seleccionada');
         }
 
+        // ✨ FUNCIÓN CORREGIDA: cambia ruta en el mapa de forma oficial
         function verRuta(indice) {
+            if (!respuestaCompleta) return;
+            // Quitar selección de todas
             document.querySelectorAll('.ruta').forEach(r => r.classList.remove('seleccionada'));
+            // Marcar la elegida
             document.getElementById(`ruta-${indice}`).classList.add('seleccionada');
-            renderizadorRuta.setDirections({ routes: [todasLasRutas[indice]] });
+            // ✅ Método correcto: mantener toda la respuesta y cambiar solo el índice
+            renderizadorRuta.setDirections(respuestaCompleta);
+            renderizadorRuta.setRouteIndex(indice); // Esta línea hace que se dibuje la ruta seleccionada
         }
 
         function limpiarTodo() {
@@ -173,11 +187,11 @@
             document.getElementById('destino').value = '';
             document.getElementById('resultados').innerHTML = `<p style="text-align:center; color:#5f6368;">Ingresa tu destino</p>`;
             renderizadorRuta.setDirections(null);
-            todasLasRutas = [];
+            respuestaCompleta = null;
         }
     </script>
 
-    <!-- ✅ Enlace corregido: escribe tu clave aquí -->
+    <!-- Enlace de la API -->
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places&callback=initMap" async defer></script>
 </body>
 </html>
