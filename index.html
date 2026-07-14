@@ -8,19 +8,14 @@
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Arial', sans-serif; }
         body { background: #f5f7fa; color: #333; }
 
-        /* Contenedor general */
         .contenedor { max-width: 1000px; margin: 0 auto; padding: 12px; }
-
-        /* Cabecera */
         h1 { text-align: center; color: #1a73e8; margin-bottom: 15px; font-size: 22px; }
 
-        /* Formulario */
         .grupo-input { margin-bottom: 12px; }
         label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 14px; }
         input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 15px; }
         input:focus { outline: none; border-color: #1a73e8; box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.2); }
 
-        /* Botones */
         .fila-botones { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
         button { flex: 1; min-width: 120px; padding: 11px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: 0.2s; }
         .btn-ubicacion { background: #34a853; color: white; }
@@ -29,16 +24,17 @@
         button:hover { opacity: 0.9; transform: translateY(-1px); }
         button:active { transform: translateY(0); }
 
-        /* Mapa */
         #map { width: 100%; height: 420px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
 
-        /* Resultados */
         #resultados { background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .ruta { margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid #eee; }
-        .ruta:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        /* Estilo para rutas clicables */
+        .ruta { margin-bottom: 18px; padding: 12px; border-radius: 6px; border: 2px solid transparent; cursor: pointer; transition: all 0.2s; }
+        .ruta:hover { background: #f8f9fa; border-color: #e8eaed; }
+        .ruta.seleccionada { background: #e8f0fe; border-color: #1a73e8; }
+        .ruta:last-child { margin-bottom: 0; }
+
         .tiempo { font-size: 17px; font-weight: bold; color: #1a73e8; margin-bottom: 5px; }
         .distancia { color: #5f6368; font-size: 14px; margin-bottom: 8px; }
-        .pasos { font-size: 14px; line-height: 1.5; }
         .transbordo { color: #ea4335; font-weight: 500; margin: 5px 0; }
         .tipo-transporte { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-right: 5px; margin-bottom: 5px; color: white; }
         .bus { background: #fbbc05; }
@@ -47,13 +43,11 @@
         .alimentador { background: #00bcd4; }
         .pie { background: #4caf50; }
 
-        /* Mensajes */
         .mensaje { padding: 10px; border-radius: 6px; margin-bottom: 10px; font-size: 14px; }
         .exito { background: #e6f4ea; color: #137333; }
         .error { background: #fce8e6; color: #c5221f; }
         .cargando { background: #e8f0fe; color: #1a73e8; }
 
-        /* Ajustes para móvil */
         @media (max-width: 600px) {
             h1 { font-size: 19px; }
             #map { height: 350px; }
@@ -65,7 +59,6 @@
 <body>
     <div class="contenedor">
         <h1>🚌 Rutas de Transporte en Lima</h1>
-
         <div id="mensajes"></div>
 
         <div class="grupo-input">
@@ -85,137 +78,89 @@
         </div>
 
         <div id="map"></div>
-
         <div id="resultados">
             <p style="text-align:center; color:#5f6368;">Ingresa tu destino y pulsa "Buscar ruta" para ver las opciones disponibles.</p>
         </div>
     </div>
 
     <script>
-        // 👇 COLOCA TU CLAVE API AQUÍ ABAJO 👇
+        // 👇 PON TU CLAVE API AQUÍ 👇
         const CLAVE_API = 'AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA';
 
-        let mapa;
-        let servicioRutas;
-        let renderizadorRuta;
-        let autocompletarOrigen;
-        let autocompletarDestino;
+        let mapa, servicioRutas, renderizadorRuta;
+        let todasLasRutas = []; // Guardamos todas las rutas para seleccionarlas
+        let autocompletarOrigen, autocompletarDestino;
 
-        // Inicializar mapa y servicios
         function initMap() {
-            // Mapa centrado en Lima
             const lima = { lat: -12.0464, lng: -77.0428 };
-            
             mapa = new google.maps.Map(document.getElementById('map'), {
-                zoom: 11,
-                center: lima,
-                mapTypeControl: true,
-                streetViewControl: false,
-                fullscreenControl: true
+                zoom: 11, center: lima,
+                mapTypeControl: true, streetViewControl: false, fullscreenControl: true
             });
 
             servicioRutas = new google.maps.DirectionsService();
             renderizadorRuta = new google.maps.DirectionsRenderer({
-                map: mapa,
-                suppressMarkers: false,
-                polylineOptions: { strokeWeight: 5 }
+                map: mapa, suppressMarkers: false, polylineOptions: { strokeWeight: 5 }
             });
 
-            // Autocompletado de direcciones
-            autocompletarOrigen = new google.maps.places.Autocomplete(document.getElementById('origen'), {
-                componentRestrictions: { country: 'pe' }
-            });
-            autocompletarDestino = new google.maps.places.Autocomplete(document.getElementById('destino'), {
-                componentRestrictions: { country: 'pe' }
-            });
+            autocompletarOrigen = new google.maps.places.Autocomplete(document.getElementById('origen'), { componentRestrictions: { country: 'pe' } });
+            autocompletarDestino = new google.maps.places.Autocomplete(document.getElementById('destino'), { componentRestrictions: { country: 'pe' } });
         }
 
-        // Mostrar mensajes al usuario
         function mostrarMensaje(texto, tipo = 'cargando') {
             const caja = document.getElementById('mensajes');
             caja.innerHTML = `<div class="mensaje ${tipo}">${texto}</div>`;
             setTimeout(() => caja.innerHTML = '', 5000);
         }
 
-        // Obtener ubicación actual
         function usarUbicacionActual() {
-            if (!navigator.geolocation) {
-                mostrarMensaje('Tu navegador no admite ubicación automática', 'error');
-                return;
-            }
-
+            if (!navigator.geolocation) { mostrarMensaje('Tu navegador no admite ubicación', 'error'); return; }
             mostrarMensaje('Detectando tu ubicación...', 'cargando');
             navigator.geolocation.getCurrentPosition(
                 (posicion) => {
-                    const ubicacion = {
-                        lat: posicion.coords.latitude,
-                        lng: posicion.coords.longitude
-                    };
-                    mapa.setCenter(ubicacion);
-                    mapa.setZoom(15);
-                    
-                    // Convertir coordenadas a dirección legible
-                    new google.maps.Geocoder().geocode({ location: ubicacion }, (resultados, estado) => {
-                        if (estado === 'OK' && resultados[0]) {
-                            document.getElementById('origen').value = resultados[0].formatted_address;
-                            mostrarMensaje('Ubicación detectada correctamente ✅', 'exito');
-                        } else {
-                            document.getElementById('origen').value = `${ubicacion.lat.toFixed(6)}, ${ubicacion.lng.toFixed(6)}`;
-                            mostrarMensaje('Usando coordenadas directamente', 'exito');
-                        }
+                    const ubi = { lat: posicion.coords.latitude, lng: posicion.coords.longitude };
+                    mapa.setCenter(ubi); mapa.setZoom(15);
+                    new google.maps.Geocoder().geocode({ location: ubi }, (res, estado) => {
+                        document.getElementById('origen').value = estado === 'OK' && res[0] ? res[0].formatted_address : `${ubi.lat.toFixed(6)}, ${ubi.lng.toFixed(6)}`;
+                        mostrarMensaje('Ubicación detectada ✅', 'exito');
                     });
                 },
-                (error) => {
-                    let texto = 'No se pudo obtener tu ubicación: ';
-                    switch(error.code) {
-                        case error.PERMISSION_DENIED: texto += 'permiso denegado. Actívalo en la configuración de tu navegador.'; break;
-                        case error.POSITION_UNAVAILABLE: texto += 'ubicación no disponible.'; break;
-                        case error.TIMEOUT: texto += 'tiempo de espera agotado.'; break;
-                    }
-                    mostrarMensaje(texto, 'error');
+                (err) => {
+                    let txt = 'No se pudo obtener ubicación: ';
+                    txt += err.code === 1 ? 'permiso denegado en navegador' : err.code === 2 ? 'no disponible' : 'tiempo agotado';
+                    mostrarMensaje(txt, 'error');
                 },
                 { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
             );
         }
 
-        // Calcular y mostrar ruta
         function calcularRuta() {
             const origen = document.getElementById('origen').value.trim();
             const destino = document.getElementById('destino').value.trim();
+            if (!origen || !destino) { mostrarMensaje('Completa ambos campos', 'error'); return; }
 
-            if (!origen || !destino) {
-                mostrarMensaje('Completa ambos campos: partida y destino', 'error');
-                return;
-            }
-
-            mostrarMensaje('Calculando mejores rutas...', 'cargando');
-
+            mostrarMensaje('Calculando rutas...', 'cargando');
             const solicitud = {
-                origin: origen,
-                destination: destino,
+                origin: origen, destination: destino,
                 travelMode: google.maps.TravelMode.TRANSIT,
-                provideRouteAlternatives: true,
-                region: 'pe',
+                provideRouteAlternatives: true, region: 'pe',
                 unitSystem: google.maps.UnitSystem.METRIC,
-                transitOptions: {
-                    modes: ['BUS', 'RAIL'],
-                    routingPreference: google.maps.TransitRoutePreference.FEWER_TRANSFERS
-                }
+                transitOptions: { modes: ['BUS', 'RAIL'], routingPreference: 'FEWER_TRANSFERS' }
             };
 
-            servicioRutas.route(solicitud, (respuesta, estado) => {
+            servicioRutas.route(solicitud, (resp, estado) => {
                 if (estado === 'OK') {
-                    renderizadorRuta.setDirections(respuesta);
-                    mostrarResultados(respuesta);
-                    mostrarMensaje(`Se encontraron ${respuesta.routes.length} opciones de ruta ✅`, 'exito');
+                    todasLasRutas = resp.routes; // Guardamos todas las rutas
+                    renderizadorRuta.setDirections(resp);
+                    mostrarResultados(resp);
+                    mostrarMensaje(`${resp.routes.length} opciones encontradas ✅ Haz clic en una para verla sola en el mapa`, 'exito');
                 } else {
-                    mostrarMensaje(`Error al buscar ruta: ${estado}`, 'error');
-                    document.getElementById('resultados').innerHTML = `<p style="color:red; text-align:center;">No se encontraron rutas para ese recorrido. Verifica las direcciones.</p>`;
+                    mostrarMensaje(`Error: ${estado}`, 'error');
+                    document.getElementById('resultados').innerHTML = `<p style="color:red;text-align:center;">No hay rutas disponibles</p>`;
                 }
             });
         }
 
-        // Mostrar detalles de las rutas
         function mostrarResultados(respuesta) {
             const caja = document.getElementById('resultados');
             let html = '';
@@ -223,65 +168,60 @@
             respuesta.routes.forEach((ruta, indice) => {
                 const tiempo = ruta.legs[0].duration.text;
                 const distancia = ruta.legs[0].distance.text;
-                const pasos = ruta.legs[0].steps;
-                const transbordos = ruta.legs[0].steps.filter(paso => paso.travel_mode === 'TRANSIT').length - 1;
+                const transbordos = ruta.legs[0].steps.filter(p => p.travel_mode === 'TRANSIT').length - 1;
 
-                html += `<div class="ruta">
+                html += `<div class="ruta" onclick="mostrarRutaSeleccionada(${indice})" id="ruta-${indice}">
                     <div class="tiempo">Opción ${indice+1}: ${tiempo}</div>
-                    <div class="distancia">Distancia total: ${distancia}</div>`;
+                    <div class="distancia">Distancia: ${distancia}</div>`;
+                html += transbordos > 0 ? `<div class="transbordo">⚠️ ${transbordos} transbordo(s)</div>` : `<div style="color:#34a853; font-weight:500;">✅ Sin transbordos</div>`;
 
-                if (transbordos > 0) {
-                    html += `<div class="transbordo">⚠️ ${transbordos} transbordo(s)</div>`;
-                } else {
-                    html += `<div style="color:#34a853; font-weight:500;">✅ Sin transbordos</div>`;
-                }
-
-                html += `<div class="pasos">`;
-
-                pasos.forEach(paso => {
+                html += `<div style="margin-top:8px; font-size:14px;">`;
+                ruta.legs[0].steps.forEach(paso => {
                     let clase = 'pie', etiqueta = 'A pie';
                     if (paso.travel_mode === 'TRANSIT') {
                         const tipo = paso.transit.line.vehicle.type;
-                        if (tipo === 'BUS') {
-                            clase = 'bus'; etiqueta = `🚌 ${paso.transit.line.short_name || paso.transit.line.name}`;
-                        } else if (tipo === 'METRO_RAIL' || tipo === 'RAIL') {
-                            clase = 'metro'; etiqueta = `🚇 ${paso.transit.line.short_name || paso.transit.line.name}`;
-                        }
-                        // Identificar sistemas específicos de Lima
                         const nombre = paso.transit.line.name.toLowerCase();
                         if (nombre.includes('metropolitano') || nombre.includes('troncal')) {
-                            clase = 'corredor'; etiqueta = `🚍 Metropolitano - ${paso.transit.line.short_name || ''}`;
+                            clase = 'corredor'; etiqueta = `🚍 Metropolitano ${paso.transit.line.short_name || ''}`;
                         } else if (nombre.includes('alimentador')) {
                             clase = 'alimentador'; etiqueta = `🔄 Alimentador ${paso.transit.line.short_name || ''}`;
                         } else if (nombre.includes('corredor')) {
                             clase = 'corredor'; etiqueta = `🚏 ${paso.transit.line.name}`;
+                        } else if (tipo === 'METRO_RAIL' || tipo === 'RAIL') {
+                            clase = 'metro'; etiqueta = `🚇 ${paso.transit.line.short_name || paso.transit.line.name}`;
+                        } else {
+                            clase = 'bus'; etiqueta = `🚌 ${paso.transit.line.short_name || paso.transit.line.name}`;
                         }
                     }
-
-                    html += `<div style="margin:6px 0;">
-                        <span class="tipo-transporte ${clase}">${etiqueta}</span>
-                        ${paso.instructions.replace(/<[^>]*>/g, '')}
-                        ${paso.distance ? `(${paso.distance.text})` : ''}
-                    </div>`;
+                    html += `<div style="margin:4px 0;"><span class="tipo-transporte ${clase}">${etiqueta}</span> ${paso.instructions.replace(/<[^>]*>/g, '')}</div>`;
                 });
-
                 html += `</div></div>`;
             });
-
             caja.innerHTML = html;
+            // Marcar la primera ruta como seleccionada por defecto
+            document.getElementById(`ruta-0`).classList.add('seleccionada');
         }
 
-        // Limpiar formulario y mapa
+        // ✨ FUNCIÓN NUEVA: Cambiar ruta en el mapa al hacer clic
+        function mostrarRutaSeleccionada(indice) {
+            // Quitar selección de todas
+            document.querySelectorAll('.ruta').forEach(r => r.classList.remove('seleccionada'));
+            // Marcar la elegida
+            document.getElementById(`ruta-${indice}`).classList.add('seleccionada');
+            // Mostrar SOLO esa ruta en el mapa
+            renderizadorRuta.setDirections({ routes: [todasLasRutas[indice]] });
+        }
+
         function limpiarTodo() {
             document.getElementById('origen').value = '';
             document.getElementById('destino').value = '';
-            document.getElementById('resultados').innerHTML = `<p style="text-align:center; color:#5f6368;">Ingresa tu destino y pulsa "Buscar ruta" para ver las opciones disponibles.</p>`;
+            document.getElementById('resultados').innerHTML = `<p style="text-align:center; color:#5f6368;">Ingresa tu destino y pulsa "Buscar ruta"</p>`;
             renderizadorRuta.setDirections(null);
-            mostrarMensaje('Campos limpiados ✅', 'exito');
+            todasLasRutas = [];
+            mostrarMensaje('Limpio ✅', 'exito');
         }
     </script>
 
-    <!-- Cargar API de Google Maps -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA&libraries=places&callback=initMap" async defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=${AIzaSyAr6Z1hFZ_HCI14Wb49_vV0q4r0oiG9BAA}&libraries=places&callback=initMap" async defer></script>
 </body>
 </html>
